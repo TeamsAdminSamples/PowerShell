@@ -27,7 +27,7 @@ Create Azure AD Application
 	* Click Microsoft Graph
 	* Click Application permissions
 	* Expand OnlineMeetings (1) and check the box for OnlineMeetings.ReadWrite.All
-    	* Expand User (1) and check the box for User.Read.All
+	* Expand User (1) and check the box for User.Read.All
 	
 - Click Add permissions
 - Remove any other permissions automatically added via App registration process
