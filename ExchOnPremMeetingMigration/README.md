@@ -1,9 +1,9 @@
 # PowerShell
 The script can be used to migrate Skype for Business to Teams meeting for a user
 
-Pre-Requisites :
+# Pre-Requisites :
 
-Create Azure AD Application
+## Create Azure AD Application
 
 - In a tenant where you have Global Admin permissions, sign-in to https://portal.azure.com
 - Navigate to Azure Active Directory > App registrations
@@ -33,7 +33,10 @@ Create Azure AD Application
 - Remove any other permissions automatically added via App registration process
 - Finally, click Grant admin consent for {tenantName}
 
-Example : 
+## Install Ews Managed Api 2.2
+- https://www.microsoft.com/en-us/download/details.aspx?id=42951
+
+# Example : 
 ![PowerApps Example](https://github.com/TeamsAdminSamples/PowerShell/blob/main/ExchOnPremMeetingMigration/Screenshot/ExchOnPremMeetingMigrationPowerapps.png)
 
 ![Power Automate Example](https://github.com/TeamsAdminSamples/PowerShell/blob/main/ExchOnPremMeetingMigration/Screenshot/ExchOnPremMeetingMigrationFlow.png?raw=true)
