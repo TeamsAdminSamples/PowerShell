@@ -1,5 +1,8 @@
 # Exchange On Premise Meeting Migration
-The script can be used to migrate Skype for Business to Teams meeting for a user
+
+The script can be used to migrate Skype for Business to Teams meeting for a user.
+This is a proof of concept how to use EWS APIs to programmatically update Skype on-prem meetings to Teams Meetings. Not production-ready code yet
+it still has the most important element: How to connect to exchange and do the actual conversion.
 
 # Pre-Requisites :
 
