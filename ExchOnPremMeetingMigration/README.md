@@ -5,26 +5,29 @@ Pre-Requisites :
 
 Create Azure AD Application
 
-· In a tenant where you have Global Admin permissions, sign-in to https://portal.azure.com
-· Navigate to Azure Active Directory > App registrations
-· Click + New registration
-· Provide a Name for your app (example: callRecordsApp)
-· Click Register
-· After app is registered, document the following
+- In a tenant where you have Global Admin permissions, sign-in to https://portal.azure.com
+- Navigate to Azure Active Directory > App registrations
+- Click + New registration
+- Provide a Name for your app (example: callRecordsApp)
+- Click Register
+- After app is registered, document the following
 	o Application (client) ID: {guid} 
 	o Directory (tenant) ID: {guid}
-· In the left rail, navigate to Certificates & secrets
-· Click + New client secret
-· After new secret is generated, document the following
+	
+- In the left rail, navigate to Certificates & secrets
+- Click + New client secret
+- After new secret is generated, document the following
 	o Client secret: {string}
-· In the left rail, navigate to API permissions
-· Click + Add a permission
+	
+- In the left rail, navigate to API permissions
+- Click + Add a permission
 	o Click Microsoft Graph
 	o Click Application permissions
 	o Expand OnlineMeetings (1) and check the box for OnlineMeetings.ReadWrite.All
-    o Expand User (1) and check the box for User.Read.All
-· Click Add permissions
-· Remove any other permissions automatically added via App registration process
-Finally, click Grant admin consent for {tenantName}
+    	o Expand User (1) and check the box for User.Read.All
+	
+- Click Add permissions
+- Remove any other permissions automatically added via App registration process
+- Finally, click Grant admin consent for {tenantName}
 
 
