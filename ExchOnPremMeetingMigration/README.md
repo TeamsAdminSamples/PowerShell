@@ -33,4 +33,8 @@ Create Azure AD Application
 - Remove any other permissions automatically added via App registration process
 - Finally, click Grant admin consent for {tenantName}
 
+Example : 
+![PowerApps Example](https://github.com/TeamsAdminSamples/PowerShell/blob/main/ExchOnPremMeetingMigration/Screenshot/ExchOnPremMeetingMigrationPowerapps.png)
+
+![Power Automate Example](https://github.com/TeamsAdminSamples/PowerShell/blob/main/ExchOnPremMeetingMigration/Screenshot/ExchOnPremMeetingMigrationFlow.png?raw=true)
 
