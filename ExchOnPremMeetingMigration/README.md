@@ -1,2 +1,40 @@
 # PowerShell
-Collection of PowerShell scripts to help with transitioning to and managing Microsoft Teams
+The script can be used to migrate Skype for Business to Teams meeting for a user
+
+Pre-Requisites :
+
+Create Azure AD Application
+
+- In a tenant where you have Global Admin permissions, sign-in to https://portal.azure.com
+- Navigate to Azure Active Directory > App registrations
+- Click + New registration
+- Provide a Name for your app (example: callRecordsApp)
+- Click Register
+- After app is registered, document the following
+	
+	* Application (client) ID: {guid} 
+	* Directory (tenant) ID: {guid}
+	
+- In the left rail, navigate to Certificates & secrets
+- Click + New client secret
+- After new secret is generated, document the following
+
+	* Client secret: {string}
+	
+- In the left rail, navigate to API permissions
+- Click + Add a permission
+
+	* Click Microsoft Graph
+	* Click Application permissions
+	* Expand OnlineMeetings (1) and check the box for OnlineMeetings.ReadWrite.All
+	* Expand User (1) and check the box for User.Read.All
+	
+- Click Add permissions
+- Remove any other permissions automatically added via App registration process
+- Finally, click Grant admin consent for {tenantName}
+
+Example : 
+![PowerApps Example](https://github.com/TeamsAdminSamples/PowerShell/blob/main/ExchOnPremMeetingMigration/Screenshot/ExchOnPremMeetingMigrationPowerapps.png)
+
+![Power Automate Example](https://github.com/TeamsAdminSamples/PowerShell/blob/main/ExchOnPremMeetingMigration/Screenshot/ExchOnPremMeetingMigrationFlow.png?raw=true)
+
