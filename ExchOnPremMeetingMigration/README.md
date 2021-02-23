@@ -11,20 +11,23 @@ Create Azure AD Application
 - Provide a Name for your app (example: callRecordsApp)
 - Click Register
 - After app is registered, document the following
-	o Application (client) ID: {guid} 
-	o Directory (tenant) ID: {guid}
+	
+	* Application (client) ID: {guid} 
+	* Directory (tenant) ID: {guid}
 	
 - In the left rail, navigate to Certificates & secrets
 - Click + New client secret
 - After new secret is generated, document the following
-	o Client secret: {string}
+
+	* Client secret: {string}
 	
 - In the left rail, navigate to API permissions
 - Click + Add a permission
-	o Click Microsoft Graph
-	o Click Application permissions
-	o Expand OnlineMeetings (1) and check the box for OnlineMeetings.ReadWrite.All
-    	o Expand User (1) and check the box for User.Read.All
+
+	* Click Microsoft Graph
+	* Click Application permissions
+	* Expand OnlineMeetings (1) and check the box for OnlineMeetings.ReadWrite.All
+    	* Expand User (1) and check the box for User.Read.All
 	
 - Click Add permissions
 - Remove any other permissions automatically added via App registration process
