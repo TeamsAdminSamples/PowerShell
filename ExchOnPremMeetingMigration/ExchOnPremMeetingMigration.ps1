@@ -1,14 +1,36 @@
-﻿## Load Managed API dll  
+﻿<#
+  .SYNOPSIS
+  Migrate Skype meeting to Teams using EWS.
 
+  .DESCRIPTION
+  The ExchOnPremMeetingMigration.ps1 script updates Skype for Business Meeting to Teams Meeting
+
+  .INPUTS
+  ExchOnPremMeetingMigration.ps1 need a user email address
+
+  .OUTPUTS
+  ExchOnPremMeetingMigration.ps1 generate a number of meetings migrated
+
+  .EXAMPLE
+  PS> .\ExchOnPremMeetingMigration.ps1
+
+#>
+
+
+
+## Load Managed API dll  
 $dllpath = "D:\home\site\wwwroot\EwsApi\Microsoft.Exchange.WebServices.dll"
 [void][Reflection.Assembly]::LoadFile($dllpath) 
 
 ### Variables
+#As an example, an azure function received content from power automate ($Request)
 $requestBody = Get-Content $Request -Raw | ConvertFrom-Json 
 ## Get the Mailbox to Access from the 1st commandline argument
 $MailboxName = $requestBody.EmailAddress
-$TenantId = ""
 
+# add your Tenant Id
+$TenantId = ""
+# Exchange Admin Account who impersonate user mailbox, i used key vault in this script
 $username = $env:AdminContosolab
 $password = $env:AdminPasswordContosolab
 
@@ -17,15 +39,16 @@ $service = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService($Excha
 $creds = New-Object System.Net.NetworkCredential($username,$password)  
 $service.Credentials = $creds      
 
-#service.UseDefaultCredentials = $true  
   
-#CAS URL Option 2 Hardcoded  
-  
+# CAS URL Hardcoded  
+# Configure your ews url 
 $uri=[system.URI] "https://webmail.contosolab.fr/ews/exchange.asmx"  
 $service.Url = $uri
-#Skype Meeting Url
+# Configure your Skype Meeting Url
 $SkypeMeetingUrl = "meet.contosolab.fr"
 
+# GetUserId retrieve the UserId. we need the userid to create Teams Meeting
+# Configure ClientId, ClientSecret and TenantId
 function GetUserId{
     param
     (
@@ -33,16 +56,16 @@ function GetUserId{
            $upn
     )
 
-    $ClientID=""
     #This is the key of the registered AzureAD app
-
+    $ClientID=""
     $ClientSecret= ""
+
     #This is your Office 365 Tenant Domain Name or Tenant Id
     $TenantId = ""
 
 
 
-    #-------------------- Get Access Token for OnlineMeetings  ----------## 
+    #-------------------- Get Access Token for UserId  ----------## 
     $AccessToken = $null
      try {
         if($null -eq $AccessToken){
@@ -69,6 +92,9 @@ function GetUserId{
     return $GraphUser
 }
 
+# CreateTeamsMeeting will create Teams Meeting with OnlineMeetings API with application right
+# Configure ClientId, ClientSecret and TenantId
+# Don't forget Grant application access Policy https://docs.microsoft.com/en-us/graph/cloud-communication-online-meeting-application-access-policy
 function CreateTeamsMeeting{
     param(
         [Parameter(Mandatory=$true)]$Upn,
@@ -76,9 +102,8 @@ function CreateTeamsMeeting{
         [Parameter(Mandatory=$true)]$StartTime,
         [Parameter(Mandatory=$true)]$EndTime
     )
-     $ClientID=""
     #This is the key of the registered AzureAD app
-
+    $ClientID=""
     $ClientSecret= ""
     #This is your Office 365 Tenant Domain Name or Tenant Id
     $TenantId = ""
@@ -298,6 +323,7 @@ foreach($Item in $ItemColl){
 $JsonOutput = $RptCollection.Count |ConvertTo-Json
 
 # Associate values to output bindings by calling 'Push-OutputBinding'.
+# Send response to Power Automate
 Out-File -Encoding Ascii -FilePath $response -inputObject $JsonOutput
 
 #Get-PSSession | Remove-PSSession
