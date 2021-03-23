@@ -13,5 +13,8 @@ Reads Persistent Chat configuration and recreates structure in Teams, this scrip
 ## RGS2CQAA
 These scripts read configured response groups and create scripts that will re-create call queues and auto attendants. The script does not create CQ & AA for you but will allow you to selectively review and run the generated scripts.
 
+## TeamsCallingPolicyUpdate
+A script to duplicate your existing Teams Calling policies and enable the option for compliance recording. This script will not grant these new policies to any users.
+
 ## z_Templates
 Collections of base PowerShell scripts with a couple of helper functions for logging.
