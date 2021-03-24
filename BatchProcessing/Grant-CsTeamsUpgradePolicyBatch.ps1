@@ -1,4 +1,4 @@
-#Requires -Modules @{ ModuleName = 'MicrosoftTeams'; ModuleVersion = '1.1.6'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9' }
+#Requires -Modules @{ ModuleVersion = '1.1.6'; ModuleName = 'MicrosoftTeams'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9' }
 
 <#
     .SYNOPSIS
@@ -46,7 +46,11 @@ param(
     [string]$LogFolderPath = ".",
     
     # Specifies whether the Completed/Remaining user files will be created with UPN
-    [switch]$LogEUII
+    [switch]$LogEUII,
+
+    [Parameter(Mandatory=$false)]
+    [ValidateNotNullOrEmpty()]
+    [string]$TeamsEnvironmentName
 )
 
 function Get-CsOnlineSessionFromTokens {
@@ -66,10 +70,19 @@ function Get-TeamsTokens {
     param(
         [Parameter(Mandatory=$true)]
         [string]
-        $UserName
+        $UserName,
+        [Parameter(Mandatory=$false)]
+        [ValidateNotNullOrEmpty()]
+        [string]$TeamsEnvironmentName
     )
+
+    # Add means to handle TeamsEnvironmentName (TeamsCloud, TeamsGCCH, TeamsDOD)
     SetupShellDependencies
-    Connect-MicrosoftTeams -AccountId $UserName | Out-Null
+    $TeamsEnvironmentParam = @{}
+    if (![string]::IsNullOrEmpty($TeamsEnvironmentName)) {
+        $TeamsEnvironmentParam['TeamsEnvironmentName'] = $TeamsEnvironmentName
+    }
+    Connect-MicrosoftTeams -AccountId $UserName @TeamsEnvironmentParam | Out-Null
     $provider = [Microsoft.Open.Teams.CommonLibrary.TeamsPowerShellSession]::SessionProvider
     $account = [Microsoft.Open.Teams.CommonLibrary.AzureAccount]::new()
     $account.Type = [Microsoft.Open.Teams.CommonLibrary.AzureAccount+AccountType]::User
@@ -165,11 +178,20 @@ function Invoke-CsOnlineBatch {
         # Specifies whether the Completed/Remaining user files will be created with UPN
         [switch]$LogEUII,
 
-        [string]$LogFile
+        [string]$LogFile,
+
+        [Parameter(Mandatory=$false)]
+        [ValidateNotNullOrEmpty()]
+        [string]$TeamsEnvironmentName
     )
 
     $SessionsToOpen = 3
     $ExpirationOffsetMinutes = 5
+
+    $TeamsEnvironmentParam = @{}
+    if (![string]::IsNullOrEmpty($TeamsEnvironmentName)) {
+        $TeamsEnvironmentParam['TeamsEnvironmentName'] = $TeamsEnvironmentName
+    }
 
     $LogFolderPath = Resolve-Path $LogFolderPath
     $LogDate = Get-Date -Format "yyyyMMdd_HHmmss"
@@ -223,12 +245,12 @@ function Invoke-CsOnlineBatch {
         if ($null -eq $currentToken) {
             Write-Host "If prompted, please sign in using the pop up window for $adminUser."
             Write-Log -Level Info -Message "Attempting to get access token for admin account." -Path $LogFile
-            $currentToken = Get-TeamsTokens -UserName $adminUser
+            $currentToken = Get-TeamsTokens -UserName $adminUser @TeamsEnvironmentParam
         }
         if (IsExpired $currentToken $ExpirationOffsetMinutes) {
             Write-Host "The access token has expired, if prompted, please sign in again using the pop up window for $adminUser."
             Write-Log -Level Warn -Message "The access token has expired, attempting to get new access token for admin account." -Path $LogFile
-            $currentToken = Get-TeamsTokens -UserName $adminUser
+            $currentToken = Get-TeamsTokens -UserName $adminUser @TeamsEnvironmentParam
         }
         $Script:Tokens.Add($currentToken) | Out-Null
     }
@@ -315,8 +337,9 @@ param(
     $RemoteScript,
     [Object[]] $OtherArgs
 )
+Import-Module -Name MicrosoftTeams -RequiredVersion 1.1.6 -ErrorAction Stop -InformationVariable $null
+
 $RemoteScript = [ScriptBlock]::Create($RemoteScript.ToString())
-Import-Module -Name MicrosoftTeams -RequiredVersion 1.1.6 | Out-Null
 
 $FunctionStrings | Invoke-Expression
 
@@ -475,6 +498,7 @@ $Session | Remove-PSSession
             }
             foreach ($i in $Info) {
                 if (![string]::IsNullOrWhiteSpace($i.MessageData)) {
+                    if ($i.Source -match 'Microsoft\.Teams\.Config\.psm1$') { continue }
                     Write-Host "Job $($i.ManagedThreadId) at $($i.TimeGenerated): $($i.MessageData)"
                     Write-Log -Level Info -Message "Job $($i.ManagedThreadId) at $($i.TimeGenerated): $($i.MessageData)" -Path $LogFile
                 }
@@ -507,7 +531,7 @@ $Session | Remove-PSSession
                     
                     try {
                         $Tokens.Remove($currentToken) | Out-Null
-                        $currentToken = Get-TeamsTokens -UserName $adminUser
+                        $currentToken = Get-TeamsTokens -UserName $adminUser @TeamsEnvironmentParam
                         $Tokens.Add($currentToken) | Out-Null
                     }
                     catch {
@@ -734,6 +758,9 @@ $BatchParams = @{
 }
 if ($PSBoundParameters.ContainsKey('UsersFilePath')) {
     $BatchParams['UsersFilePath'] = $UsersFilePath
+}
+if ($PSBoundParameters.ContainsKey('TeamsEnvironmentName')) {
+    $BatchParams['TeamsEnvironmentName'] = $TeamsEnvironmentName
 }
 
 Invoke-CsOnlineBatch @BatchParams

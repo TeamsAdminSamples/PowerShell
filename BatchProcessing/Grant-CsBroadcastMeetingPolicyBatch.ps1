@@ -2,10 +2,10 @@
 
 <#
     .SYNOPSIS
-    Grants the given ConferencingPolicy
+    Grants the given BroadcastMeetingPolicy
     
     .DESCRIPTION
-    Grants the given ConferencingPolicy for all users enabled or from a user provided list.
+    Grants the given BroadcastMeetingPolicy for all users enabled or from a user provided list.
     It will run with multiple sessions from multiple administrator accounts as desired to increase parallelization.
 
     .INPUTS
@@ -15,11 +15,11 @@
     None. This script fully executes the process and outputs nothing to the pipeline. All console interaction is informational only.
 
     .EXAMPLE
-    Grant-CsConferencingPolicyBatch -UserName admin1@contoso.com, admin2@contoso.com -PolicyName $null -IsTest $false
+    Grant-CsBroadcastMeetingPolicyBatch -UserName admin1@contoso.com, admin2@contoso.com -PolicyName $null -IsTest $false
     This runs a policy update for all enabled users in the tenant leveraging 2 administrator accounts for a maximum of 6 concurrent sessions
 
     .EXAMPLE
-    Grant-CsConferencingPolicyBatch -UserName admin1@contoso.com -PolicyName $null -UsersFilePath .\userstomigrate.txt
+    Grant-CsBroadcastMeetingPolicyBatch -UserName admin1@contoso.com -PolicyName $null -UsersFilePath .\userstomigrate.txt
     This runs a test policy grant for the users listed in .\userstomigrate.txt using 1 administrator account
 #>
 
@@ -27,7 +27,7 @@ param(
     #  The name of the policy instance.
     [string]$PolicyName,
 
-    # Specifies if Grant-CsConferencingPolicyBatch should be run with WhatIf switch, default is $true, set to $false to actually perform the change
+    # Specifies if Grant-CsBroadcastMeetingPolicyBatch should be run with WhatIf switch, default is $true, set to $false to actually perform the change
     [bool]$IsTest = $true,
 
     # Specifies the admin user names used to open SkypeOnline PowerShell sessions
@@ -717,9 +717,9 @@ function Write-Log {
 
 $LogFolderPath = Resolve-Path $LogFolderPath
 $LogDate = Get-Date -Format "yyyyMMdd_HHmmss"
-$LogFile = "$LogFolderPath\CsConferencingPolicyBatch_$LogDate.log"
+$LogFile = "$LogFolderPath\CsBroadcastMeetingPolicyBatch_$LogDate.log"
 
-Write-Log -Level Info -Path $LogFile -Message "Grant-CsConferencingPolicyBatch"
+Write-Log -Level Info -Path $LogFile -Message "Grant-CsBroadcastMeetingPolicyBatch"
 
 if ($IsTest) {
     $IsTestWarning = "This is running as a test. Please add -IsTest `$false to your command in order to actually perform this action."
@@ -730,7 +730,7 @@ if ($IsTest) {
 $FilterScript = [ScriptBlock]::Create('Enabled -eq $true')
 $JobScript = [ScriptBlock]::Create(@'
 param($filterSB, $ArgHash)
-Get-CsOnlineUser -Filter $filterSB | Grant-CsConferencingPolicy @ArgHash
+Get-CsOnlineUser -Filter $filterSB | Grant-CsBroadcastMeetingPolicy @ArgHash
 '@)
 
 $ArgHash = @{
