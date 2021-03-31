@@ -1,16 +1,20 @@
 param(
-    [Parameter(Mandatory= $true)]
+    [Parameter(Mandatory = $true)]
     [string]
     $RGSExportPath,
     
-    [Parameter(Mandatory= $true)]
+    [Parameter(Mandatory = $true)]
     [string]
     $SipDomain,
 
-    [bool]
-    $GenerateAccountsOnline = $false,
+    [Parameter(ParameterSetName = "OnPrem",
+        Mandatory = $true)]
+    [switch]
+    $GenerateAccountsOnPrem,
 
     # OU for hybrid object creation
+    [Parameter(ParameterSetName = "OnPrem",
+        Mandatory = $true)]
     [string]
     $ResourceOU,
 
@@ -22,8 +26,7 @@ param(
 # TODO: add lines for required modules
 #       need: Get-AzureADUser
 #       need: MicrosoftTeams
-#       need: SfBServer if -not $GenerateAccountsOnline
-# TODO: add session refresh scripts?
+#       need: SfBServer if $GenerateAccountsOnPrem
 
 # TODO: Add switch for phone number assignment
 # TODO: how to handle DR vs Service Number in addition to Hybrid vs Online accounts
@@ -243,10 +246,12 @@ function ConvertNonQuestionAction {
             else {
                 if (![string]::IsNullOrEmpty($TextPrompt)) {
                     $CommandText.AppendLine("`t`$$CommandHashName[`"$TextPromptParamName`"] = `"$TextPrompt`"") | Out-Null
-                } elseif (![string]::IsNullOrEmpty($AudioFilePromptLocation)) {
+                }
+                elseif (![string]::IsNullOrEmpty($AudioFilePromptLocation)) {
                     AddFileImportScript -ApplicationId HuntGroup -StoredLocation $AudioFilePromptLocation -FileName $AudioFilePromptOriginalName -CommandText $CommandText -WarningStrings $WarningStrings
                     $CommandText.AppendLine("`t`$$CommandHashName[`"$AudioPromptParamName`"] = `"`$(`$FileId.Id)`"") | Out-Null
-                } else {
+                }
+                else {
                     $WarningStrings.AppendLine("$FlowName will to transfer to $([regex]::replace($URI,'^[Ss][Ii][Pp]:','')) on $ActionName. No Prompt information was found, so a sample Text-To-Speech prompt was generated.") | Out-Null
                     $CommandText.AppendLine("`t`$$CommandHashName[`"$TextPromptParamName`"] = `"Please leave a message.`"") | Out-Null
                 }
@@ -823,7 +828,7 @@ foreach ($Workflow in $CallQueues) {
     # Add name to param list
     $CallQueueParams["Name"] = "`$CQName"
 
-    # TODO: Need to add module logic to a given script, also any imports as needed for session reconnection
+    # TODO: Need to add module logic to a given script
 
     $CommandText.AppendLine("# Original HuntGroup Name: $($Workflow.Name)") | Out-Null
     $CommandText.AppendLine("#     Original Queue Name: $($DefaultQueue.Name)") | Out-Null
@@ -831,16 +836,128 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("#             New CQ Name: $CQDispName") | Out-Null
     $CommandText.AppendLine("#                 LineUri: $LineURI") | Out-Null
     $CommandText.AppendLine() | Out-Null
-    $CommandText.AppendLine("# OVERRIDE AUTOMATIC NAMING HERE") | Out-Null
-    $CommandText.AppendLine("# these will be the display names used for the created AA and CQ objects") | Out-Null
-    $CommandText.AppendLine("`$AAName = `"$AADispName`"") | Out-Null
-    $CommandText.AppendLine("`$CQName = `"$CQDispName`"") | Out-Null
-    $CommandText.AppendLine("# these strings will be used to generate the UPN for the objects in AAD/AD. Only A-Z, a-z, 0-9, - and _ characters will be kept. Also, all strings will be shortened to the first 17 characters") | Out-Null
-    $CommandText.AppendLine("# if there is a conflict found with another account, the string will be shortened to 13 characters and 4 random letters will be added to the end of the string") | Out-Null
-    $CommandText.AppendLine("`$CQAccountName = `"$CQName`"`t# this will be prefixed with `"CQ-`"") | Out-Null
-    $CommandText.AppendLine("`$AAAccountName = `"$AAName`"`t# this will be prefixed with `"AA-`"") | Out-Null
+
+    $CommandText.AppendLine("param (") | Out-Null
+    $CommandText.AppendLine("`t[switch]`$GenerateAccountsOnly") | Out-Null
+    $CommandText.AppendLine(")") | Out-Null
     $CommandText.AppendLine() | Out-Null
+
+    $CommandText.AppendLine("`$CsvPath = [IO.Path]::Combine(`$PSScriptRoot,`"`$([IO.Path]::GetFileNameWithoutExtension(`$MyInvocation.MyCommand.Name)).csv`")") | Out-Null
+    $CommandText.AppendLine("if (!(Test-Path -Path `$CsvPath)) { Write-Warning `"Cannot locate config csv at path `$CsvPath. Exiting...`"; exit }") | Out-Null
+    $CommandText.AppendLine("`$Config = Import-Csv -Path `$CsvPath") | Out-Null
+    $CommandText.AppendLine("`$AAName = `$Config.AADispName") | Out-Null
+    $CommandText.AppendLine("`$CQName = `$Config.CQDispName") | Out-Null
+    $CommandText.AppendLine("`$CQAccountName = `$Config.CQName") | Out-Null
+    $CommandText.AppendLine("`$AAAccountName = `$Config.AAName") | Out-Null
+    $CommandText.AppendLine("`$DeploymentStatus = `$Config.DeploymentStatus") | Out-Null
     $CommandText.AppendLine() | Out-Null
+
+    $CommandText.AppendLine("function CreateApplicationInstance {") | Out-Null
+    $CommandText.AppendLine("`tparam(") | Out-Null
+    $CommandText.AppendLine("`t`t[string]`$AccountName,") | Out-Null
+    $CommandText.AppendLine("`t`t[string]`$Name,") | Out-Null
+    $CommandText.AppendLine("`t`t[string]`$SipDomain,") | Out-Null
+    $CommandText.AppendLine("`t`t[switch]`$CQ,") | Out-Null
+    $CommandText.AppendLine("`t`t[switch]`$AA,") | Out-Null
+    $CommandText.AppendLine("`t`t[switch]`$Hybrid,") | Out-Null
+    $CommandText.AppendLine("`t`t[string]`$OU") | Out-Null
+    $CommandText.AppendLine("`t)") | Out-Null
+    $CommandText.AppendLine("`t`$Prefix = if (`$CQ) { `"CQ-`" } elseif (`$AA) { `"AA-`" }") | Out-Null
+    $CommandText.AppendLine("`t`$ApplicationId = if (`$CQ) { `"11cd3e2e-fccb-42ad-ad00-878b93575e07`" } elseif (`$AA) { `"ce933385-9390-45d1-9512-c8d228074e07`" }") | Out-Null
+    $CommandText.AppendLine("`t# Getting a valid UPN for the Application Instance") | Out-Null
+    $CommandText.AppendLine("`t`$UPN = `$Prefix + (`$AccountName.Trim() -replace '[^a-zA-Z0-9_\-]', '').ToLower()") | Out-Null
+    $CommandText.AppendLine("`t`$UPN = `$UPN.Substring(0, [System.Math]::Min(20, `$UPN.Length)) + `"@`$SipDomain`"") | Out-Null
+    $CommandText.AppendLine("`tdo {") | Out-Null
+    $CommandText.AppendLine("`t`t`$UPNExist = try {") | Out-Null
+    $CommandText.AppendLine("`t`t`tif (`$Hybrid) {") | Out-Null
+    $CommandText.AppendLine("`t`t`t`tGet-CsHybridApplicationEndpoint -Filter { UserPrincipalName -eq `"`$UPN`" }") | Out-Null
+    $CommandText.AppendLine("`t`t`t} else {") | Out-Null
+    $CommandText.AppendLine("`t`t`t`tGet-CsOnlineApplicationInstance -Identity `$UPN") | Out-Null
+    $CommandText.AppendLine("`t`t`t}") | Out-Null
+    $CommandText.AppendLine("`t`t} catch {") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$null") | Out-Null
+    $CommandText.AppendLine("`t`t}") | Out-Null
+    $CommandText.AppendLine("`t`tif ([string]::IsNullOrEmpty(`$UPNExist)) {") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$valid = `$true") | Out-Null
+    $CommandText.AppendLine("`t`t} else {") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$valid = `$false") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$Random = -join ((97..122) | Get-Random -Count 4 | ForEach-Object { [char]`$_ })") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$UPN = `$Prefix + (`$AccountName.Trim() -replace '[^a-zA-Z0-9_\-]', '').ToLower()") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$UPN = `$UPN.Substring(0, [System.Math]::Min(16, `$UPN.Length)) + `$Random + `"@`$SipDomain`"") | Out-Null
+    $CommandText.AppendLine("`t`t}") | Out-Null
+    $CommandText.AppendLine("`t} until (`$valid)") | Out-Null
+    $CommandText.AppendLine("`t# Creating the Application Instance") | Out-Null
+    $CommandText.AppendLine("`ttry {") | Out-Null
+    $CommandText.AppendLine("`t`tif (`$Hybrid) {") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$NewInstance = New-CsHybridApplicationEndpoint -DisplayName `$Name -SipAddress `"sip:`$UPN`" -OU `$OU -ApplicationId `$ApplicationId") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$InstanceId = [Guid]::new(`$NewInstance.Name).Guid") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$InstanceUpn = `$NewInstance.UserPrincipalName -replace `"^`$Prefix`",'`$1'") | Out-Null
+    $CommandText.AppendLine("`t`t} else {") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$NewInstance = New-CsOnlineApplicationInstance -UserPrincipalName `$UPN -ApplicationId `$ApplicationId -DisplayName `$Name") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$InstanceId = `$NewInstance.ObjectID") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$InstanceUpn = `$NewInstance.UserPrincipalName -replace `"^`$Prefix`",'`$1'") | Out-Null
+    $CommandText.AppendLine("`t`t}") | Out-Null
+    $CommandText.AppendLine("`t} catch {") | Out-Null
+    $CommandText.AppendLine("`t`tWrite-Warning `"Unable to create application instance/hybrid endpoint for `$Name ending processing.`"") | Out-Null
+    $CommandText.AppendLine("`t`tthrow `$_.Exception") | Out-Null
+    $CommandText.AppendLine("`t`texit") | Out-Null
+    $CommandText.AppendLine("`t}") | Out-Null
+    $CommandText.AppendLine("`t[PSCustomObject]@{") | Out-Null
+    $CommandText.AppendLine("`t`tInstanceId = `$InstanceId") | Out-Null
+    $CommandText.AppendLine("`t`tInstanceUpn = `$InstanceUpn") | Out-Null
+    $CommandText.AppendLine("`t}") | Out-Null
+    $CommandText.AppendLine("}") | Out-Null
+    $CommandText.AppendLine() | Out-Null
+
+    $CommandText.AppendLine("# Creating the application instances") | Out-Null
+    $CommandText.AppendLine("if (`$DeploymentStatus.ToLower() -eq `"new`" ) {") | Out-Null
+    $CommandText.Append("`t`$CQInstance = CreateApplicationInstance -AccountName `$CQAccountName -Name `$CQName -SipDomain `"$SipDomain`" -CQ") | Out-Null
+    if ($GenerateAccountsOnPrem) { 
+        $CommandText.AppendLine(" -Hybrid -OU `"$ResourceOU`"") | Out-Null 
+    }
+    else {
+        $CommandText.AppendLine() | Out-Null 
+    }
+    $CommandText.AppendLine("`t`$DeploymentStatus = `"CQAccountDeployed`"") | Out-Null
+    $CommandText.AppendLine("`t`$Config.CQName = (`$CQInstance.InstanceUpn -split '@')[0]") | Out-Null 
+    $CommandText.AppendLine("`t`$Config.DeploymentStatus = `$DeploymentStatus") | Out-Null
+    $CommandText.AppendLine("`t`$Config | Export-Csv -Path `$CsvPath -NoTypeInformation") | Out-Null
+    $CommandText.AppendLine("}") | Out-Null
+
+    $CommandText.AppendLine("if (`$DeploymentStatus.ToLower() -eq `"cqaccountdeployed`" ) {") | Out-Null
+    $CommandText.Append("`t`$AAInstance = CreateApplicationInstance -AccountName `$AAAccountName -Name `$AAName -SipDomain `"$SipDomain`" -AA") | Out-Null
+    if ($GenerateAccountsOnPrem) { 
+        $CommandText.AppendLine(" -Hybrid -OU `"$ResourceOU`"") | Out-Null 
+    }
+    else {
+        $CommandText.AppendLine() | Out-Null 
+    }
+    $CommandText.AppendLine("`t`$DeploymentStatus = `"AccountsDeployed`"") | Out-Null
+    $CommandText.AppendLine("`t`$Config.AAName = (`$AAInstance.InstanceUpn -split '@')[0]") | Out-Null 
+    $CommandText.AppendLine("`t`$Config.DeploymentStatus = `$DeploymentStatus") | Out-Null
+    $CommandText.AppendLine("`t`$Config | Export-Csv -Path `$CsvPath -NoTypeInformation") | Out-Null 
+    $CommandText.AppendLine("}") | Out-Null
+    $CommandText.AppendLine("if (`$GenerateAccountsOnly ) { Write-Warning `"Accounts Created, run script again without GenerateAccountsOnly switch to continue processing.`"; exit }") | Out-Null
+    $CommandText.AppendLine() | Out-Null
+
+    # Create both AA and CQ endpoints so we only have to wait once
+    $CommandText.AppendLine("# Waiting the Call Queue and Auto Attendant Application Instances to replicate") | Out-Null
+    $CommandText.AppendLine("do {") | Out-Null
+    $CommandText.AppendLine("`t`$ExistsOnline = `$false") | Out-Null
+    $CommandText.AppendLine("`t`$CQInstance = Get-CsOnlineApplicationInstance -Identity ('CQ-' + `$Config.CQName + `"@$SipDomain`")") | Out-Null
+    $CommandText.AppendLine("`t`$CQEndpoint = Get-CsOnlineApplicationEndpoint -Uri (`"sip:`" + 'CQ-' + `$Config.CQName + `"@$SipDomain`")") | Out-Null
+    $CommandText.AppendLine("`t`$AAInstance = Get-CsOnlineApplicationInstance -Identity ('AA-' + `$Config.AAName + `"@$SipDomain`")") | Out-Null
+    $CommandText.AppendLine("`t`$AAEndpoint = Get-CsOnlineApplicationEndpoint -Uri (`"sip:`" + 'AA-' + `$Config.AAName + `"@$SipDomain`")") | Out-Null
+    $CommandText.AppendLine("`tif(`$null -ne `$CQInstance -and `$null -ne `$CQEndpoint -and `$null -ne `$AAInstance -and `$null -ne `$AAEndpoint) {") | Out-Null
+    $CommandText.AppendLine("`t`t`$ExistsOnline = `$true") | Out-Null
+    $CommandText.AppendLine("`t}") | Out-Null
+    $CommandText.AppendLine("} until (`$ExistsOnline)") | Out-Null
+    $CommandText.AppendLine() | Out-Null
+
+    $CommandText.AppendLine("`$CQInstanceId = `$CQInstance.ObjectID") | Out-Null
+    $CommandText.AppendLine("`$AAInstanceId = `$AAInstance.ObjectID") | Out-Null
+    $CommandText.AppendLine() | Out-Null
+
     $CommandText.AppendLine("# Building the Call Queue") | Out-Null
     $CommandText.AppendLine() | Out-Null
     $CommandText.AppendLine("`$CallQueueParams = @{}") | Out-Null
@@ -1026,114 +1143,6 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`tthrow `$_.Exception") | Out-Null
     $CommandText.AppendLine("`texit") | Out-Null
     $CommandText.AppendLine("}") | Out-Null
-    $CommandText.AppendLine() | Out-Null
-
-    $CommandText.AppendLine("# Getting a valid UPN for the Call Queue Application Instance") | Out-Null
-    $CommandText.AppendLine("`$CQUPN = `"CQ-`" + (`$CQAccountName.Trim() -replace '[^a-zA-Z0-9_\-]', '').ToLower()") | Out-Null
-    $CommandText.AppendLine("`$CQUPN = `$CQUPN.Substring(0, [System.Math]::Min(20, `$CQUPN.Length)) + `"@$SipDomain`"") | Out-Null
-    $CommandText.AppendLine("do {") | Out-Null
-    $CommandText.AppendLine("`t`$UPNExist = try {") | Out-Null
-    $CommandText.AppendLine("`t`t`$GetInst = Get-CsOnlineApplicationInstance -Identity `$CQUPN") | Out-Null
-    if (!$GenerateAccountsOnline) {
-        $CommandText.AppendLine("`t`t`$HybridEnd = Get-CsHybridApplicationEndpoint -Filter {UserPrincipalName -eq `"`$CQUPN`"}") | Out-Null
-        $CommandText.AppendLine("`t`t`$GetInst = if (`$null -ne `$GetInst -or `$null -ne `$HybridEnd) {") | Out-Null
-        $CommandText.AppendLine("`t`t`t`"exists`"") | Out-Null
-        $CommandText.AppendLine("`t`t} else {") | Out-Null
-        $CommandText.AppendLine("`t`t`t`$null") | Out-Null
-        $CommandText.AppendLine("`t`t}") | Out-Null
-    }
-    $CommandText.AppendLine("`t`t`$GetInst") | Out-Null
-    $CommandText.AppendLine("`t} catch {") | Out-Null
-    $CommandText.AppendLine("`t`t`$null") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine("`tif ([string]::IsNullOrEmpty(`$UPNExist)) {") | Out-Null
-    $CommandText.AppendLine("`t`t`$valid = `$true") | Out-Null
-    $CommandText.AppendLine("`t} else {") | Out-Null
-    $CommandText.AppendLine("`t`t`$Random = -join ((97..122) | Get-Random -Count 4 | ForEach-Object { [char]`$_ })") | Out-Null
-    $CommandText.AppendLine("`t`t`$CQUPN = `"CQ-`" + (`$CQAccountName.Trim() -replace '[^a-zA-Z0-9_\-]', '').ToLower()") | Out-Null
-    $CommandText.AppendLine("`t`t`$CQUPN = `$CQUPN.Substring(0, [System.Math]::Min(16, `$CQUPN.Length)) + `$Random + `"@$SipDomain`"") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine("} until (`$valid)") | Out-Null
-    $CommandText.AppendLine() | Out-Null
-
-    $CommandText.AppendLine("# Creating the Call Queue Application Instance") | Out-Null
-    $CommandText.AppendLine("try {") | Out-Null
-    if ($GenerateAccountsOnline) {
-        $CommandText.AppendLine("`t`$NewInstance = New-CsOnlineApplicationInstance -UserPrincipalName `$CQUPN -ApplicationId `"11cd3e2e-fccb-42ad-ad00-878b93575e07`" -DisplayName `"`$CQName`"") | Out-Null
-        $CommandText.AppendLine("`t`$CQInstanceId = `$NewInstance.ObjectID") | Out-Null
-        $CommandText.AppendLine("`t`$CQInstanceUpn = `$NewInstance.UserPrincipalName") | Out-Null
-    }
-    else {
-        $CommandText.AppendLine("`t`$NewInstance = New-CsHybridApplicationEndpoint -DisplayName `"`$CQName`" -SipAddress `"sip:`$CQUPN`" -OU `"$ResourceOU`" -ApplicationId `"11cd3e2e-fccb-42ad-ad00-878b93575e07`"") | Out-Null
-        $CommandText.AppendLine("`t`$CQInstanceId = [Guid]::new(`$NewInstance.Name).Guid") | Out-Null
-        $CommandText.AppendLine("`t`$CQInstanceUpn = `$NewInstance.UserPrincipalName") | Out-Null
-    }
-    $CommandText.AppendLine("} catch {") | Out-Null
-    $CommandText.AppendLine("`tWrite-Warning `"Unable to create application instance/hybrid endpoint for `$CQName ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`tthrow `$_.Exception") | Out-Null
-    $CommandText.AppendLine("`texit") | Out-Null
-    $CommandText.AppendLine("}") | Out-Null
-    $CommandText.AppendLine() | Out-Null
-
-    $CommandText.AppendLine("# Getting a valid UPN for the Auto Attendant Application Instance") | Out-Null
-    $CommandText.AppendLine("`$AAUPN = `"AA-`" + (`$AAAccountName.Trim() -replace '[^a-zA-Z0-9_\-]', '').ToLower()") | Out-Null
-    $CommandText.AppendLine("`$AAUPN = `$AAUPN.Substring(0, [System.Math]::Min(20, `$AAUPN.Length)) + `"@$SipDomain`"") | Out-Null
-    $CommandText.AppendLine("do {") | Out-Null
-    $CommandText.AppendLine("`t`$UPNExist = try {") | Out-Null
-    $CommandText.AppendLine("`t`t`$GetInst = Get-CsOnlineApplicationInstance -Identity `$AAUPN") | Out-Null
-    if (!$GenerateAccountsOnline) {
-        $CommandText.AppendLine("`t`t`$HybridEnd = Get-CsHybridApplicationEndpoint -Filter {UserPrincipalName -eq `"`$AAUPN`"}") | Out-Null
-        $CommandText.AppendLine("`t`t`$GetInst = if (`$null -ne `$GetInst -or `$null -ne `$HybridEnd) {") | Out-Null
-        $CommandText.AppendLine("`t`t`t`"exists`"") | Out-Null
-        $CommandText.AppendLine("`t`t} else {") | Out-Null
-        $CommandText.AppendLine("`t`t`t`$null") | Out-Null
-        $CommandText.AppendLine("`t`t}") | Out-Null
-    }
-    $CommandText.AppendLine("`t`t`$GetInst") | Out-Null
-    $CommandText.AppendLine("`t} catch {") | Out-Null
-    $CommandText.AppendLine("`t`t`$null") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine("`tif ([string]::IsNullOrEmpty(`$UPNExist)) {") | Out-Null
-    $CommandText.AppendLine("`t`t`$valid = `$true") | Out-Null
-    $CommandText.AppendLine("`t} else {") | Out-Null
-    $CommandText.AppendLine("`t`t`$Random = -join ((97..122) | Get-Random -Count 4 | ForEach-Object { [char]`$_ })") | Out-Null
-    $CommandText.AppendLine("`t`t`$AAUPN = `"AA-`" + (`$AAAccountName.Trim() -replace '[^a-zA-Z0-9_\-]', '').ToLower()") | Out-Null
-    $CommandText.AppendLine("`t`t`$AAUPN = `$AAUPN.Substring(0, [System.Math]::Min(16, `$AAUPN.Length)) + `$Random + `"@$SipDomain`"") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine("} until (`$valid)") | Out-Null
-    $CommandText.AppendLine() | Out-Null
-
-    $CommandText.AppendLine("# Creating the Auto Attendant Application Instance") | Out-Null
-    $CommandText.AppendLine("try {") | Out-Null
-    if ($GenerateAccountsOnline) {
-        $CommandText.AppendLine("`t`$NewInstance = New-CsOnlineApplicationInstance -UserPrincipalName `$AAUPN -ApplicationId `"ce933385-9390-45d1-9512-c8d228074e07`" -DisplayName `"`$AAName`"") | Out-Null
-        $CommandText.AppendLine("`t`$AAInstanceId = `$NewInstance.ObjectID") | Out-Null
-        $CommandText.AppendLine("`t`$AAInstanceUpn = `$NewInstance.UserPrincipalName") | Out-Null
-    }
-    else {
-        $CommandText.AppendLine("`t`$NewInstance = New-CsHybridApplicationEndpoint -DisplayName `"`$AAName`" -SipAddress `"sip:`$AAUPN`" -OU `"$ResourceOU`" -ApplicationId `"ce933385-9390-45d1-9512-c8d228074e07`"") | Out-Null
-        $CommandText.AppendLine("`t`$AAInstanceId = [Guid]::new(`$NewInstance.Name).Guid") | Out-Null
-        $CommandText.AppendLine("`t`$AAInstanceUpn = `$NewInstance.UserPrincipalName") | Out-Null
-    }
-    $CommandText.AppendLine("} catch {") | Out-Null
-    $CommandText.AppendLine("`tWrite-Warning `"Unable to create application instance/hybrid endpoint for `$AAName ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`tthrow `$_.Exception") | Out-Null
-    $CommandText.AppendLine("`texit") | Out-Null
-    $CommandText.AppendLine("}") | Out-Null
-    $CommandText.AppendLine() | Out-Null
-
-    # Create both AA and CQ endpoints so we only have to wait once
-    $CommandText.AppendLine("# Waiting the Call Queue and Auto Attendant Application Instances to replicate") | Out-Null
-    $CommandText.AppendLine("do {") | Out-Null
-    $CommandText.AppendLine("`t`$ExistsOnline = `$false") | Out-Null
-    $CommandText.AppendLine("`t`$CQInstance = Get-CsOnlineApplicationInstance -Identity `$CQInstanceUpn") | Out-Null
-    $CommandText.AppendLine("`t`$CQEndpoint = Get-CsOnlineApplicationEndpoint -Uri `$CQInstanceUpn") | Out-Null
-    $CommandText.AppendLine("`t`$AAInstance = Get-CsOnlineApplicationInstance -Identity `$AAInstanceUpn") | Out-Null
-    $CommandText.AppendLine("`t`$AAEndpoint = Get-CsOnlineApplicationEndpoint -Uri `$AAInstanceUpn") | Out-Null
-    $CommandText.AppendLine("`tif(`$null -ne `$CQInstance -and `$null -ne `$CQEndpoint -and `$null -ne `$AAInstance -and `$null -ne `$AAEndpoint) {") | Out-Null
-    $CommandText.AppendLine("`t`t`$ExistsOnline = `$true") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine("} until (`$ExistsOnline)") | Out-Null
     $CommandText.AppendLine() | Out-Null
 
     $CommandText.AppendLine("# Creating Call Queue Application Instance Association") | Out-Null
@@ -1388,7 +1397,7 @@ foreach ($Workflow in $CallQueues) {
         $CommandText.AppendLine() | Out-Null
         $CommandText.AppendLine("# Assigning the phone number Auto Attendant Instance") | Out-Null
         $CommandText.AppendLine("try {") | Out-Null
-        if ($GenerateAccountsOnline) {
+        if (!$GenerateAccountsOnPrem) {
             $CommandText.AppendLine("`tSet-CsOnlineVoiceApplicationInstance -Identity `$AAInstanceId -TelephoneNumber `"+$LineUri`"") | Out-Null
         }
         else {
@@ -1400,6 +1409,22 @@ foreach ($Workflow in $CallQueues) {
         $CommandText.AppendLine("`texit") | Out-Null
         $CommandText.AppendLine("}") | Out-Null
     }
+
+    $CommandText.AppendLine() | Out-Null
+    $CommandText.AppendLine("`$DeploymentStatus = `"WorkflowDeployed`"") | Out-Null
+    $CommandText.AppendLine("`$Config.DeploymentStatus = `$DeploymentStatus") | Out-Null
+    $CommandText.AppendLine("`$Config | Export-Csv -Path `$CsvPath -NoTypeInformation") | Out-Null
+
+    $CsvPath = [IO.Path]::Combine($GeneratedScriptsPath, ($AADispName + ".csv"))
+    $WorkflowInfo = [PSCustomObject]@{
+        AADispName       = $AADispName
+        CQDispName       = $CQDispName
+        CQName           = $CQName
+        AAName           = $AAName
+        DeploymentStatus = "New"
+    }
+    $WorkflowInfo | Export-Csv -Path $CsvPath -NoTypeInformation
+
     # Remove traling newline
     $CommandText.Remove($CommandText.Length - [Environment]::NewLine.Length, [Environment]::NewLine.Length) | Out-Null
 
@@ -1412,3 +1437,18 @@ foreach ($Workflow in $CallQueues) {
     $Content = ($Warnings + $CommandText.ToString()) -replace "`t", "    "
     Set-Content -Path $FileName -Value $Content -Encoding UTF8
 }
+
+$StatusScript = @'
+$CsvFiles = Get-ChildItem -Path $PSScriptRoot -Filter *.csv
+$Statuses = @{}
+foreach ($CsvFile in $CsvFiles) {
+    $status = (Import-Csv -Path $CsvFile)[0]
+    if ($null -eq $Statuses[$status.DeploymentStatus]) {
+        $Statuses[$status.DeploymentStatus] = [Collections.Generic.List[string]]::new()
+    }
+    $Statuses[$status.DeploymentStatus].Add([IO.Path]::GetFileNameWithoutExtension($CsvFile.Name))
+}
+[PSCustomObject]$Statuses
+'@
+
+Set-Content -Value $StatusScript -Path ([IO.Path]::Combine($GeneratedScriptsPath,"GetDeploymentStatus.ps1"))
