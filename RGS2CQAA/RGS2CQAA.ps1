@@ -177,8 +177,8 @@ function ConvertNonQuestionAction {
         "TransferToQueue" {
             $Queue = $ProcessedQueues.Where( { $_.Identity -eq $QueueId })[0]
             if ($null -eq $Queue) {
-                $WarningStrings.AppendLine("$Prepend$FlowName will to transfer to the queue with ID: $QueueId. This queue was not found, the $ActionName will be set to disconnect") | Out-Null
-                $CommandText.AppendLine("$PrependWrite-Warning `"Queue not found, set to Disconnect`"") | Out-Null
+                $WarningStrings.AppendLine("$FlowName will to transfer to the queue with ID: $QueueId. This queue was not found, the $ActionName will be set to disconnect") | Out-Null
+                $CommandText.AppendLine("${Prepend}Write-Warning `"Queue not found, set to Disconnect`"") | Out-Null
                 WriteDisconnectAction -CommandText $CommandText -CommandHashName $CommandHashName -ActionName $ActionName -AAMenuOption:$AAMenuOption -Prepend $Prepend
             }
             else {
@@ -190,7 +190,7 @@ function ConvertNonQuestionAction {
                 $CommandText.AppendLine("$Prepend`t`$null") | Out-Null
                 $CommandText.AppendLine("$Prepend}") | Out-Null
 
-                $CommandText.AppendLine("$Prependif ([string]::IsNullOrEmpty(`$Queue)) {") | Out-Null
+                $CommandText.AppendLine("${Prepend}if ([string]::IsNullOrEmpty(`$Queue)) {") | Out-Null
                 $CommandText.AppendLine("$Prepend`tWrite-Warning `"TransferToQueue could not find valid object for $QueueName, $ActionName set to Disconnect`"") | Out-Null
                 WriteDisconnectAction -CommandText $CommandText -CommandHashName $CommandHashName -ActionName $ActionName -AAMenuOption:$AAMenuOption -NumTabs 1 -Prepend $Prepend
                 $CommandText.AppendLine("$Prepend} else {") | Out-Null
@@ -214,7 +214,7 @@ function ConvertNonQuestionAction {
             $CommandText.AppendLine("$Prepend} catch {") | Out-Null
             $CommandText.AppendLine("$Prepend`t`$null") | Out-Null
             $CommandText.AppendLine("$Prepend}") | Out-Null
-            $CommandText.AppendLine("$Prependif ([string]::IsNullOrEmpty(`$Target)) {") | Out-Null
+            $CommandText.AppendLine("${Prepend}if ([string]::IsNullOrEmpty(`$Target)) {") | Out-Null
             $CommandText.AppendLine("$Prepend`tWrite-Warning `"TransferToUri could not find valid object for $URI, $ActionName set to Disconnect`"") | Out-Null
             WriteDisconnectAction -CommandText $CommandText -CommandHashName $CommandHashName -ActionName $ActionName -AAMenuOption:$AAMenuOption -NumTabs 1 -Prepend $Prepend
             $CommandText.AppendLine("$Prepend} else {") | Out-Null
@@ -237,7 +237,7 @@ function ConvertNonQuestionAction {
             $CommandText.AppendLine("$Prepend} catch {") | Out-Null
             $CommandText.AppendLine("$Prepend`t`$null") | Out-Null
             $CommandText.AppendLine("$Prepend}") | Out-Null
-            $CommandText.AppendLine("$Prependif ([string]::IsNullOrEmpty(`$Target)) {") | Out-Null
+            $CommandText.AppendLine("${Prepend}if ([string]::IsNullOrEmpty(`$Target)) {") | Out-Null
             $CommandText.AppendLine("$Prepend`tWrite-Warning `"TransferToVoicemailUri could not find valid object for $([regex]::replace($URI,'^[Ss][Ii][Pp]:','')), $ActionName set to Disconnect`"") | Out-Null
             WriteDisconnectAction -CommandText $CommandText -CommandHashName $CommandHashName -ActionName $ActionName -AAMenuOption:$AAMenuOption -NumTabs 1 -Prepend $Prepend
             $CommandText.AppendLine("$Prepend} else {") | Out-Null
@@ -302,7 +302,7 @@ function AddFileImportScript {
     }
     $WarningStrings.AppendLine("Ensure this file exists in this relative path prior to execution: .\AudioFiles\$([IO.Path]::GetFileName($SavedFile))") | Out-Null
     $CommandText.AppendLine("$Prepend`$FilePath = [IO.Path]::Combine(`$PSScriptRoot, `"AudioFiles`", `"$([IO.Path]::GetFileName($SavedFile))`")") | Out-Null
-    $CommandText.AppendLine("$Prepend`$FileBytes = Get-Content -Path `$FilePath -Encoding Byte -ReadCount 0") | Out-Null
+    $CommandText.AppendLine("$Prepend`$FileBytes = [IO.File]::ReadAllBytes(`$FilePath)") | Out-Null
     $CommandText.AppendLine("$Prepend`$FileId = Import-CsOnlineAudioFile -ApplicationId $ApplicationId -FileName `"$FileName`" -Content `$FileBytes") | Out-Null
 }
 
@@ -1123,7 +1123,7 @@ foreach ($Workflow in $CallQueues) {
 
     if (![string]::IsNullOrEmpty($Workflow.CustomMusicOnHoldStoredLocation)) {
         $CommandText.AppendLine("`t# Importing Custom Hold Music audio file") | Out-Null
-        AddFileImportScript -ApplicationId HuntGroup -StoredLocation $Workflow.CustomMusicOnHoldStoredLocation -FileName $Workflow.CustomMusicOnHoldFileName -CommandText $CommandText -WarningStrings $WarningStrings
+        AddFileImportScript -ApplicationId HuntGroup -StoredLocation $Workflow.CustomMusicOnHoldStoredLocation -FileName $Workflow.CustomMusicOnHoldFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend "`t"
         $CommandText.AppendLine() | Out-Null
         $CallQueueParams['MusicOnHoldAudioFileId'] = "`$(`$FileId.Id)"
     }
@@ -1172,7 +1172,7 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`t`$DefaultMenu = New-CsAutoAttendantMenu -Name `"Default Menu`" -MenuOptions @(`$DefaultMenuOption)") | Out-Null
 
     if (![string]::IsNullOrWhiteSpace($Workflow.DefaultActionPromptAudioFilePromptStoredLocation)) {
-        AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.DefaultActionPromptAudioFilePromptStoredLocation -FileName $Workflow.DefaultActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings
+        AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.DefaultActionPromptAudioFilePromptStoredLocation -FileName $Workflow.DefaultActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend "`t"
         $CommandText.AppendLine("`t`$DefaultGreetingPrompt = New-CsAutoAttendantPrompt -AudioFilePrompt `$FileId") | Out-Null
         $CommandText.AppendLine("`t`$DefaultCallFlow = New-CsAutoAttendantCallFlow -Name `"Default Call Flow`" -Greetings @(`$DefaultGreetingPrompt) -Menu `$DefaultMenu") | Out-Null
     }
@@ -1247,7 +1247,7 @@ foreach ($Workflow in $CallQueues) {
             $CommandText.AppendLine("`t`$AfterHoursCallFlow = New-CsAutoAttendantCallFlow -Name `"After Hours Call Flow`" -Greetings @(`$AfterHoursGreetingPrompt) -Menu `$AfterHoursMenu") | Out-Null
         }
         elseif (![string]::IsNullOrEmpty($Workflow.NonBusinessHoursActionPromptAudioFilePromptStoredLocation)) {
-            AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.NonBusinessHoursActionPromptAudioFilePromptStoredLocation -FileName $Workflow.NonBusinessHoursActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings
+            AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.NonBusinessHoursActionPromptAudioFilePromptStoredLocation -FileName $Workflow.NonBusinessHoursActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend "`t"
             $CommandText.AppendLine("`t`$AfterHoursGreetingPrompt = New-CsAutoAttendantPrompt -AudioFilePrompt `$FileId") | Out-Null
             $CommandText.AppendLine("`t`$AfterHoursCallFlow = New-CsAutoAttendantCallFlow -Name `"After Hours Call Flow`" -Greetings @(`$AfterHoursGreetingPrompt) -Menu `$AfterHoursMenu") | Out-Null
         }
@@ -1311,7 +1311,7 @@ foreach ($Workflow in $CallQueues) {
             $CommandText.AppendLine("`t`$HolidayCallFlow$c = New-CsAutoAttendantCallFlow -Name `"Holiday Call Flow $c`" -Greetings @(`$HolidayGreetingPrompt) -Menu `$HolidayMenu") | Out-Null
         }
         elseif (![string]::IsNullOrEmpty($Workflow.HolidayActionPromptAudioFilePromptStoredLocation)) {
-            AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.HolidayActionPromptAudioFilePromptStoredLocation -FileName $Workflow.HolidayActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings
+            AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.HolidayActionPromptAudioFilePromptStoredLocation -FileName $Workflow.HolidayActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend "`t"
             $CommandText.AppendLine("`t`$HolidayGreetingPrompt = New-CsAutoAttendantPrompt -AudioFilePrompt `$FileId") | Out-Null
             $CommandText.AppendLine("`t`$HolidayCallFlow$c = New-CsAutoAttendantCallFlow -Name `"Holiday Call Flow $c`" -Greetings @(`$HolidayGreetingPrompt) -Menu `$HolidayMenu") | Out-Null
         }
