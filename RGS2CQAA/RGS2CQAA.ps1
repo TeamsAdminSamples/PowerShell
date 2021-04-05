@@ -897,7 +897,7 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`ttry {") | Out-Null
     $CommandText.AppendLine("`t`tif (`$Hybrid) {") | Out-Null
     $CommandText.AppendLine("`t`t`t`$NewInstance = New-CsHybridApplicationEndpoint -DisplayName `$Name -SipAddress `"sip:`$UPN`" -OU `$OU -ApplicationId `$ApplicationId") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$InstanceId = [Guid]::new(`$NewInstance.Name).Guid") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$InstanceId = (New-Object -TypeName System.Guid -ArgumentList `$NewInstance.Name).Guid") | Out-Null
     $CommandText.AppendLine("`t`t`t`$InstanceUpn = `$NewInstance.UserPrincipalName -replace `"^`$Prefix`",'`$1'") | Out-Null
     $CommandText.AppendLine("`t`t} else {") | Out-Null
     $CommandText.AppendLine("`t`t`t`$NewInstance = New-CsOnlineApplicationInstance -UserPrincipalName `$UPN -ApplicationId `$ApplicationId -DisplayName `$Name") | Out-Null
