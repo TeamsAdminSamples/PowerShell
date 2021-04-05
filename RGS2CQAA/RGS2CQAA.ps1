@@ -898,11 +898,11 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`t`tif (`$Hybrid) {") | Out-Null
     $CommandText.AppendLine("`t`t`t`$NewInstance = New-CsHybridApplicationEndpoint -DisplayName `$Name -SipAddress `"sip:`$UPN`" -OU `$OU -ApplicationId `$ApplicationId") | Out-Null
     $CommandText.AppendLine("`t`t`t`$InstanceId = (New-Object -TypeName System.Guid -ArgumentList `$NewInstance.Name).Guid") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$InstanceUpn = `$NewInstance.UserPrincipalName -replace `"^`$Prefix`",'`$1'") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$InstanceUpn = `$NewInstance.UserPrincipalName -replace `"^`$Prefix`",''") | Out-Null
     $CommandText.AppendLine("`t`t} else {") | Out-Null
     $CommandText.AppendLine("`t`t`t`$NewInstance = New-CsOnlineApplicationInstance -UserPrincipalName `$UPN -ApplicationId `$ApplicationId -DisplayName `$Name") | Out-Null
     $CommandText.AppendLine("`t`t`t`$InstanceId = `$NewInstance.ObjectID") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$InstanceUpn = `$NewInstance.UserPrincipalName -replace `"^`$Prefix`",'`$1'") | Out-Null
+    $CommandText.AppendLine("`t`t`t`$InstanceUpn = `$NewInstance.UserPrincipalName -replace `"^`$Prefix`",''") | Out-Null
     $CommandText.AppendLine("`t`t}") | Out-Null
     $CommandText.AppendLine("`t} catch {") | Out-Null
     $CommandText.AppendLine("`t`tWrite-Warning `"Unable to create application instance/hybrid endpoint for `$Name ending processing.`"") | Out-Null
