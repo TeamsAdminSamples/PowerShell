@@ -1021,8 +1021,17 @@ foreach ($Workflow in $CallQueues) {
         $CommandText.AppendLine("`t# Adding Agent Uris from AgentGroup to the Queue") | Out-Null
         $CommandText.AppendLine("`t`$AgentsByUri = [Collections.Generic.List[object]]::new()") | Out-Null
         $CommandText.AppendLine("`t`$AgentUris = @(") | Out-Null
+        $AgentCount = 1
         foreach ($AgentUri in $DefaultQueueAgentGroup.AgentsByUri) {
-            $CommandText.AppendLine("`t`t`"$AgentUri`"") | Out-Null
+            if ($AgentCount -le 20) {
+                $CommandText.AppendLine("`t`t`"$AgentUri`"") | Out-Null
+            } else {
+                if ($AgentCount -eq 21) {
+                    $WarningStrings.AppendLine("More than 20 agents assigned to queue, only first 20 will be added.") | Out-Null
+                }
+                $CommandText.AppendLine("`t`t`# `"$AgentUri`"") | Out-Null
+            }
+            $AgentCount++
         }
         $CommandText.AppendLine("`t)") | Out-Null
         $CommandText.AppendLine("`tforeach (`$AgentUri in `$AgentUris) {") | Out-Null
@@ -1191,7 +1200,7 @@ foreach ($Workflow in $CallQueues) {
         $CommandText.AppendLine("`t# Building the Auto Attendant After Hours Action") | Out-Null
         $BusinessHours = @($HoursOfBusiness).Where( { $_.Identity.InstanceID.Guid -eq $Workflow.BusinessHoursID })[0]
         $HoursName = [regex]::Replace($BusinessHours.Name, '_?[A-Fa-f0-9]{8}(?:-?[A-Fa-f0-9]{4}){3}-?[A-Fa-f0-9]{12}$', '')
-        $CommandText.AppendLine("`t`$AfterHoursSchedule = (Get-CsOnlineSchedule).Where({ `$_.Name -eq `"$HoursName`" })[0]") | Out-Null
+        $CommandText.AppendLine("`t`$AfterHoursSchedule = @(Get-CsOnlineSchedule).Where({ `$_.Name -eq `"$HoursName`" })[0]") | Out-Null
         $CommandText.AppendLine("`tif (`$null -eq `$AfterHoursSchedule) {") | Out-Null
         $CommandText.AppendLine("`t`t`$OnlineScheduleParams = @{") | Out-Null
         $CommandText.AppendLine("`t`t`tName = `"$HoursName`"") | Out-Null
@@ -1268,7 +1277,7 @@ foreach ($Workflow in $CallQueues) {
         $CommandText.AppendLine("`t# Building the Auto Attendant Holiday Hours Action $c") | Out-Null
         $HolidaySet = @($HolidaySets).Where( { $_.Identity.InstanceID.Guid -eq $HolidayId })[0]
         $HolidayName = [regex]::Replace($HolidaySet.Name, '_?[A-Fa-f0-9]{8}(?:-?[A-Fa-f0-9]{4}){3}-?[A-Fa-f0-9]{12}$', '')
-        $CommandText.AppendLine("`t`$HolidaySchedule = (Get-CsOnlineSchedule).Where({ `$_.Name -eq `"$HolidayName`" })[0]") | Out-Null
+        $CommandText.AppendLine("`t`$HolidaySchedule = @(Get-CsOnlineSchedule).Where({ `$_.Name -eq `"$HolidayName`" })[0]") | Out-Null
         $CommandText.AppendLine("`tif (`$null -eq `$HolidaySchedule) {") | Out-Null
         $CommandText.AppendLine("`t`t`$OnlineScheduleParams = @{") | Out-Null
         $CommandText.AppendLine("`t`t`tName = `"$HolidayName`"") | Out-Null
@@ -1388,7 +1397,7 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`t# Assigning the licenses to the Auto Attendant Instance") | Out-Null
     $CommandText.AppendLine("`t`$LicenseSkuId = `"440eaaa8-b3e0-484b-a8be-62870b9ba70a`" # this guid is the phone system virtual user by default") | Out-Null
     $CommandText.AppendLine("`t`$SkuFeaturesToEnable = @(`"TEAMS1`",`"MCOPSTN1`", `"MCOEV`", `"MCOEV_VIRTUALUSER`")") | Out-Null
-    $CommandText.AppendLine("`t`$StandardLicense = (Get-AzureADSubscribedSku).Where({`$_.SkuId -eq `$LicenseSkuId})[0]") | Out-Null
+    $CommandText.AppendLine("`t`$StandardLicense = @(Get-AzureADSubscribedSku).Where({`$_.SkuId -eq `$LicenseSkuId})[0]") | Out-Null
     $CommandText.AppendLine("`t`$SkuFeaturesToDisable = `$StandardLicense.ServicePlans.Where({`$_.ServicePlanName -notin `$SkuFeaturesToEnable})") | Out-Null
     $CommandText.AppendLine("`t`$License = [Microsoft.Open.AzureAD.Model.AssignedLicense]::new()") | Out-Null
     $CommandText.AppendLine("`t`$License.SkuId = `$StandardLicense.SkuId") | Out-Null
