@@ -1,15 +1,18 @@
-﻿#this script will Delete the all teams except given job titles match
+﻿#This script will delete all Teams except given job titles match
 #Provide job title phrases separate by , 
-#for best practice run the script quote delete cmdlet
+#For best practice run the script quote delete cmdlet
 
-$logfile = "C:\log_$(get-date -format `"yyyyMMdd_hhmmsstt`").txt"
+#Example :Script will delete HR Team if anyone of Team member job title does not match and the script will send an email to HR Team owner behalf of mailsender(admin@contoso.com)
+
+param(
+      [Parameter(Mandatory=$true)][System.String]$mailsender,
+      [Parameter(Mandatory=$true)][System.String]$KeepJobtitles,
+      [Parameter(Mandatory=$true)][System.String]$Tenantid,
+      [Parameter(Mandatory=$true)][System.String]$client_Id,
+      [Parameter(Mandatory=$true)][System.String]$Client_Secret
+      )
+$logfile = ".\log_$(get-date -format `"yyyyMMdd_hhmmsstt`").txt"
 $start = [system.datetime]::Now
-
-     $Tenantid=read-host "Please provide tenant id"
-     $client_Id=Read-host "Please provide client id"
-     $Client_Secret=read-host "Please provide client secret"
-     $mailsender = read-host "Please provide mailsender"
-     $KeepJobtitles = read-host "Please provide KeepJobtitles"
 
 #Grant Adminconsent 
 $Grant= 'https://login.microsoftonline.com/common/adminconsent?client_id='
@@ -86,7 +89,7 @@ if ($proceed -eq 'Y')
                     $DeletedTeam = $team | select displayName
                     $deleteURL = "https://graph.microsoft.com/v1.0/groups/" + "$id" 
                     try{
-                    #$DeleteTeam = Invoke-RestMethod -Headers $Header -Uri $deleteURL -Method DELETE 
+                    $DeleteTeam = Invoke-RestMethod -Headers $Header -Uri $deleteURL -Method DELETE 
                     }
                     Catch {
                       $_.Exception | Out-File $logfile -Append
@@ -150,4 +153,3 @@ else{ write-host Re run the script and press Y}
 $end = [system.datetime]::Now
 $resultTime = $end - $start
 Write-Host "Execution took : $($resultTime.TotalSeconds) seconds." -ForegroundColor Cyan
-

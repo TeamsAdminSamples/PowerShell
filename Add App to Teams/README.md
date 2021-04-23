@@ -1,8 +1,8 @@
-# Add App to Teams or Tenant
+# Add App to Team
 
 # Description
 
-Script is to add TeamsApp to Teams by providing the parameters TeamId and AppName 
+This PowerShell script is to add a Teams App to Microsoft Teams by providing Teamid and AppName
   
 # Prerequisites
 

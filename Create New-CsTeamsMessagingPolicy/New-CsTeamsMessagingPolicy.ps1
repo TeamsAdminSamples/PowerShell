@@ -1,11 +1,16 @@
-$logfile = "C:\CreateNew-CsTeamsMessagingPolicylog_$(get-date -format `"yyyyMMdd_hhmmsstt`").txt"
+# This script will create Microsoft Teams messaging policy (Restricting peer - peer chat) using PowerShell cmdlets.
+
+param(
+      [Parameter(Mandatory=$true)][System.String]$PolicyName
+      )
+
+$logfile = ".\CreateNew-CsTeamsMessagingPolicylog_$(get-date -format `"yyyyMMdd_hhmmsstt`").txt"
 $start = [system.datetime]::Now
 
 Import-Module SkypeOnlineConnector
 $sfbSession = New-CsOnlineSession 
 Import-PSSession $sfbSession -AllowClobber
 
-$PolicyName = Read-Host "Please provide PolicyName"
  try{
 New-CsTeamsMessagingPolicy -Identity "$PolicyName" -AllowUserChat $false
 }
