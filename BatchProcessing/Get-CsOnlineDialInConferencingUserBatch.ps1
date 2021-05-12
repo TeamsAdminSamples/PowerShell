@@ -1,4 +1,4 @@
-#Requires -Modules @{ ModuleVersion = '1.1.6'; ModuleName = 'MicrosoftTeams'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9' }
+#Requires -Modules @{ ModuleName = 'MicrosoftTeams'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9'; ModuleVersion = '1.1.6' }
 
 <#
     .SYNOPSIS
@@ -222,8 +222,13 @@ function Invoke-CsOnlineBatch {
         WriteUsers $Users $UsersRemaining
     }
 
-    SetupShellDependencies
-
+    try {
+        SetupShellDependencies
+    } catch {
+        Write-Warning -Message $_.Exception.Message
+        Write-Log -Level Error -Path $LogFile -Message $_.Exception.Message
+        exit 1
+    }
     # Attempt to initialize all available sessions to get valid tokens
     
     if ($null -eq $Tokens) {
@@ -279,7 +284,20 @@ function Invoke-CsOnlineBatch {
     if ($Sessions.Count -eq 0) {
         Write-Warning "Unable to create a valid session"
         Write-Log -Level Error -Message "Unable to create a valid session" -Path $LogFile
-        exit
+        exit 1
+    }
+
+    if (($Sessions.Count/$SessionsToOpen) -ne $UserName.Count) {
+        Write-Warning "Unable to create all possible sessions for all admin accounts!"
+        Write-Log -Level Warn -Message "Unable to create all possible sessions for all admin accounts!" -Path $LogFile
+        $p = Read-Host -Prompt "Press 'a' to abort, any other key to continue"
+        if ($p.Trim().ToLower() -eq 'a') {
+            foreach ($s in $Sessions) {
+                $s.Value | Remove-PSSession -ErrorAction SilentlyContinue
+            }
+            Write-Log -Level Info -Message "Aborting script" -Path $LogFile
+            exit 1
+        }
     }
 
     Write-Host "Successfully created $($Sessions.Count) total sessions"
@@ -334,7 +352,6 @@ $RemoteScript = [ScriptBlock]::Create($RemoteScript.ToString())
 $FunctionStrings | Invoke-Expression
 
 if (IsExpired $OAuthToken $ExpirationOffsetMinutes) {
-    # add logic to exit job returning remaining users (and)
     [PsCustomObject]@{
         Retry = $true
         TokenExpired = $true
@@ -413,12 +430,13 @@ foreach ($user in $users) {
         $filter.Append(" -or ") | Out-Null
     }
 }
+Write-Host "Finished sending requests for all $($UsersCompleted.Count) users."
 # Tear down PSSession
 $Session | Remove-PSSession
 [PsCustomObject] @{
     Retry = $false
-    UsersRemaining = @()
-    UsersCompleted = $users
+    UsersRemaining = $UsersRemaining
+    UsersCompleted = $UsersCompleted
     Output = $Results
     Error = $null
 }
@@ -662,7 +680,19 @@ function PadBase64String([string] $stringToPad) {
 }
 
 function SetupShellDependencies {
-    # no unhandled dependencies at this point, retaining this for potential needs later
+    $sp = $null
+    $err = $null
+    try { $sp = [Microsoft.Open.Teams.CommonLibrary.TeamsPowerShellSession]::SessionProvider } catch { $err = $_.FullyQualifiedErrorId }
+    try { $sp = [Microsoft.Open.Teams.CommonLibrary.AzureAccount]::new() } catch { $err = $_.FullyQualifiedErrorId }
+    if ($null -ne $err) {
+        $err = $null
+        try { $sp = [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider } catch { $err = $_.FullyQualifiedErrorId }
+        if ($null -ne $err) {
+            throw "MicrosoftTeams module is either too old or not loaded, Ensure version 1.1.6 is the only loaded version before running!"
+        } else {
+            throw "MicrosoftTeams module is updated beyond the supported version for this script. Ensure version 1.1.6 is the only loaded version before running!"
+        }
+    }
 }
 
 function Write-Log {
