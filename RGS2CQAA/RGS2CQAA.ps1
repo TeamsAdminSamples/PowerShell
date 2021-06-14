@@ -1,9 +1,17 @@
+[cmdletbinding(DefaultParameterSetName = "Online")]
+
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(ParameterSetName = "Online",
+        Mandatory = $true)]
+    [Parameter(ParameterSetName = "OnPrem",
+        Mandatory = $true)]
     [string]
     $RGSExportPath,
     
-    [Parameter(Mandatory = $true)]
+    [Parameter(ParameterSetName = "Online",
+        Mandatory = $true)]
+    [Parameter(ParameterSetName = "OnPrem",
+        Mandatory = $true)]
     [string]
     $SipDomain,
 
@@ -19,6 +27,10 @@ param(
     $ResourceOU,
 
     # Default Usage Location
+    [Parameter(ParameterSetName = "Online",
+        Mandatory = $false)]
+    [Parameter(ParameterSetName = "OnPrem",
+        Mandatory = $false)]
     [string]
     $UsageLocation = "US"
 )
@@ -906,7 +918,7 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`t`t}") | Out-Null
     $CommandText.AppendLine("`t} catch {") | Out-Null
     $CommandText.AppendLine("`t`tWrite-Warning `"Unable to create application instance/hybrid endpoint for `$Name ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`tthrow `$_.Exception") | Out-Null
+    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
     $CommandText.AppendLine("`t`texit") | Out-Null
     $CommandText.AppendLine("`t}") | Out-Null
     $CommandText.AppendLine("`t[PSCustomObject]@{") | Out-Null
@@ -980,7 +992,7 @@ foreach ($Workflow in $CallQueues) {
         # Write-Warning "$FileName has no assigned Agent Groups"
         # $WarningStrings.AppendLine("$($DefaultQueue.Name) has no assigned Agent Groups") | Out-Null
     }
-    $CallQueueParams["AllowOptOut"] = $DefaultQueueAgentGroup.ParticipationPolicy -eq 'Informal'     # AllowOptOut: Informal -> true, Formal -> false
+    $CallQueueParams["AllowOptOut"] = $DefaultQueueAgentGroup.ParticipationPolicy -eq 'Formal'     # AllowOptOut: Informal -> true, Formal -> false
 
     $RoundValueParams = @{
         InputTime   = $DefaultQueueAgentGroup.AgentAlertTime
@@ -1087,9 +1099,9 @@ foreach ($Workflow in $CallQueues) {
     if (![string]::IsNullOrEmpty($warn)) {
         $WarningStrings.AppendLine($warn) | Out-Null
     }
-    if ($null -ne $DefaultQueueAgentGroup.OverflowThreshold) {
+    if ($null -ne $DefaultQueue.OverflowThreshold) {
         $RoundValueParams = @{
-            InputTime   = $DefaultQueueAgentGroup.OverflowThreshold
+            InputTime   = $DefaultQueue.OverflowThreshold
             MinimumTime = 0
             RoundTo     = 1
             MaximumTime = 200
@@ -1119,9 +1131,9 @@ foreach ($Workflow in $CallQueues) {
     if (![string]::IsNullOrEmpty($warn)) {
         $WarningStrings.AppendLine($warn) | Out-Null
     }
-    if ($null -ne $DefaultQueueAgentGroup.TimeoutThreshold) {
+    if ($null -ne $DefaultQueue.TimeoutThreshold) {
         $RoundValueParams = @{
-            InputTime   = $DefaultQueueAgentGroup.TimeoutThreshold
+            InputTime   = $DefaultQueue.TimeoutThreshold
             MinimumTime = 45
             RoundTo     = 15
             MaximumTime = 2700
@@ -1141,7 +1153,8 @@ foreach ($Workflow in $CallQueues) {
     }
 
     # PresenceBasedRouting (off by default)
-    # $CallQueueParams["PresenceBasedRouting"] = $true
+    $CallQueueParams["PresenceBasedRouting"] = $true
+    
     # ConferenceMode (off by default)
     # $CallQueueParams["ConferenceMode"] = $true
 
@@ -1158,7 +1171,7 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`t`t`$CallQueue = New-CsCallQueue @CallQueueParams") | Out-Null
     $CommandText.AppendLine("`t} catch {") | Out-Null
     $CommandText.AppendLine("`t`tWrite-Error `"Unable to create call queue `$CQAccountName!`"") | Out-Null
-    $CommandText.AppendLine("`t`tthrow `$_.Exception") | Out-Null
+    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
     $CommandText.AppendLine("`t`texit") | Out-Null
     $CommandText.AppendLine("`t}") | Out-Null
     $CommandText.AppendLine() | Out-Null
@@ -1168,7 +1181,7 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`t`t`$CQAssoc = New-CsOnlineApplicationInstanceAssociation -ConfigurationType CallQueue -ConfigurationId `$(`$CallQueue.Identity) -Identities `$CQInstanceId") | Out-Null
     $CommandText.AppendLine("`t} catch {") | Out-Null
     $CommandText.AppendLine("`t`tWrite-Warning `"Unable to create application association for `$CQName ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`tthrow `$_.Exception") | Out-Null
+    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
     $CommandText.AppendLine("`t`texit") | Out-Null
     $CommandText.AppendLine("`t}") | Out-Null
     $CommandText.AppendLine() | Out-Null
@@ -1359,7 +1372,7 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`t`t`$AutoAttendant = New-CsAutoAttendant @AAParams") | Out-Null
     $CommandText.AppendLine("`t} catch {") | Out-Null
     $CommandText.AppendLine("`t`tWrite-Warning `"Unable to create new AA for `$AAName ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`tthrow `$_.Exception") | Out-Null
+    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
     $CommandText.AppendLine("`t`texit") | Out-Null
     $CommandText.AppendLine("`t}") | Out-Null
     $CommandText.AppendLine() | Out-Null
@@ -1369,7 +1382,7 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`t`t`$AAAssoc = New-CsOnlineApplicationInstanceAssociation -ConfigurationType AutoAttendant -ConfigurationId `$(`$AutoAttendant.Identity) -Identities `$AAInstanceId") | Out-Null
     $CommandText.AppendLine("`t} catch {") | Out-Null
     $CommandText.AppendLine("`t`tWrite-Warning `"Unable to create application association for $($CallQueueParams['Name']) ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`tthrow `$_.Exception") | Out-Null
+    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
     $CommandText.AppendLine("`t`texit") | Out-Null
     $CommandText.AppendLine("`t}") | Out-Null
     $CommandText.AppendLine() | Out-Null
@@ -1384,7 +1397,7 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`t`tGet-AzureADUser -ObjectId `$CQInstanceId | Set-AzureADUser -UsageLocation `"$UsageLocation`"") | Out-Null
     $CommandText.AppendLine("`t} catch {") | Out-Null
     $CommandText.AppendLine("`t`tWrite-Warning `"Unable to set Usage Location for objects, ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`tthrow `$_.Exception") | Out-Null
+    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
     $CommandText.AppendLine("`t`texit") | Out-Null
     $CommandText.AppendLine("`t}") | Out-Null
     $CommandText.AppendLine("`tdo {") | Out-Null
@@ -1407,16 +1420,14 @@ foreach ($Workflow in $CallQueues) {
     $CommandText.AppendLine("`ttry {") | Out-Null
     $CommandText.AppendLine("`t`tSet-AzureADUserLicense -ObjectId `$AAInstanceId -AssignedLicenses `$LicensesToAssign") | Out-Null
     $CommandText.AppendLine("`t} catch {") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `"Unable to apply license plan to `$AAInstanceId, ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`tthrow `$_.Exception") | Out-Null
+    $CommandText.AppendLine("`t`tWrite-Warning `"Unable to apply license plan to `$AAInstanceId, you will need to do this manually.`"") | Out-Null
+    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
     $CommandText.AppendLine("`t`texit") | Out-Null
+    $CommandText.AppendLine("`t} finally {") | Out-Null
+    $CommandText.AppendLine("`t`t`$DeploymentStatus = `"WorkflowDeployed`"") | Out-Null
+    $CommandText.AppendLine("`t`t`$Config.DeploymentStatus = `$DeploymentStatus") | Out-Null
+    $CommandText.AppendLine("`t`t`$Config | Export-Csv -Path `$CsvPath -NoTypeInformation") | Out-Null
     $CommandText.AppendLine("`t}") | Out-Null
-
-    $CommandText.AppendLine() | Out-Null
-    $CommandText.AppendLine("`t`$DeploymentStatus = `"WorkflowDeployed`"") | Out-Null
-    $CommandText.AppendLine("`t`$Config.DeploymentStatus = `$DeploymentStatus") | Out-Null
-    $CommandText.AppendLine("`t`$Config | Export-Csv -Path `$CsvPath -NoTypeInformation") | Out-Null
-
     $CommandText.AppendLine("}") | Out-Null
 
     if (![string]::IsNullOrEmpty($LineURI)) {
@@ -1433,7 +1444,7 @@ foreach ($Workflow in $CallQueues) {
         }
         $CommandText.AppendLine("`t} catch {") | Out-Null
         $CommandText.AppendLine("`t`tWrite-Warning `"Unable to assign LineUri $LineUri to `$AAInstanceId, ending processing.`"") | Out-Null
-        $CommandText.AppendLine("`t`tthrow `$_.Exception") | Out-Null
+        $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
         $CommandText.AppendLine("`t`texit") | Out-Null
         $CommandText.AppendLine("`t}") | Out-Null
 
