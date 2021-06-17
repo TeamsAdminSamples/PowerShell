@@ -1,7 +1,7 @@
 # User Policy Assignment
 # Description:
 UserPolicyAssignment script will work for assigning custom user policies for N no. of users\
-To run the script please install [SFB online connector](https://www.microsoft.com/en-us/download/details.aspx?id=39366)
+To run the script please install [MicrosoftTeams module](https://www.powershellgallery.com/packages/MicrosoftTeams/2.0.0)
 - Import the Module into Windows PowerShell 
 - Get the script from the `UserPolicyAssignment.ps1` file and paste it into Windows PowerShell, then run the script
 - Script has all the available policies to the user listed below, please provide the required input from 1 to 12 to apply the policy

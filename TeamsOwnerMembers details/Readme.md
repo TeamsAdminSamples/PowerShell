@@ -4,7 +4,7 @@
 The script will fetch the Teams owner and members details
 
 # Prerequisite
-   [Install-Module MicrosoftTeams](https://www.powershellgallery.com/packages/MicrosoftTeams/1.0.6)
+MicrosoftTeams module. Reference-[Microsoft Teams PowerShell Release Notes](https://docs.microsoft.com/en-us/microsoftteams/teams-powershell-release-notes)
 
 # Procedure
 
@@ -37,5 +37,6 @@ Click Yes at the UAC prompt
  The details of each Team will stores in a .csv file with below details 
  
  |Team Name| Team id|Team Owner|Team member|
+ |---|---|---|---|
  
  A log file will be generated with exceptions, errors along with script execution time
