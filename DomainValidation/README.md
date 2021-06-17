@@ -5,9 +5,9 @@ Script fetches the SIP enabled domains from Tenant, skips the DNS query for the 
 If all the domains are pointing to Webdir.online.lync.com script displays the **Overall status is Ok**, even if one of the domain is pointing to outside webdir.online.lync.com then script displays the **Overall status is not Ok** message
 
 # Prerequisite
-[SFB online connector](https://www.microsoft.com/en-us/download/details.aspx?id=39366)
+ MicrosoftTeams module. Reference-[Microsoft Teams PowerShell Release Notes](https://docs.microsoft.com/en-us/microsoftteams/teams-powershell-release-notes)
 # Input
-Global Administrator or Skype for Business Online administrator account user principal name and password, and then select OK
+Global Administrator or MicrosoftTeams administrator account user principal name and password, and then select OK
 # Examples
 ##### Example 1
 If domain resolving to webdir.online.lync.com 
@@ -56,6 +56,7 @@ Skip domains list
 Overall Tenant status - Ok/Not Ok
 
 |Domain Name |Status |ErrorMessage|
+|---|---|---|
 
 #### Example
 ![Sample Output](https://github.com/Geetha63/MS-Teams-Scripts/blob/master/Images/DomainValidation.jpg)
