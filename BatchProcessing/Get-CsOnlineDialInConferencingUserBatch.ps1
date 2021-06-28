@@ -1,4 +1,4 @@
-#Requires -Modules @{ ModuleName = 'MicrosoftTeams'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9'; ModuleVersion = '1.1.6' }
+#Requires -Modules @{ ModuleName = 'MicrosoftTeams'; ModuleVersion = '1.1.6'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9' }
 
 <#
     .SYNOPSIS
@@ -403,7 +403,7 @@ foreach ($user in $users) {
                     UsersRemaining = $UsersRemaining
                     UsersCompleted = $UsersCompleted
                     Output = $Results
-                    Error = $_.Exception
+                    Error = $_
                 }
             } else {
                 # return non-finished users
@@ -412,7 +412,7 @@ foreach ($user in $users) {
                     UsersRemaining = $UsersRemaining
                     UsersCompleted = $UsersCompleted
                     Output = $Results
-                    Error = $_.Exception
+                    Error = $_
                 }
             }
             $Session | Remove-PSSession
@@ -512,8 +512,14 @@ $Session | Remove-PSSession
                 }
             }
 
-            $poshErr = if ($null -ne $finishedJob.PowerShellInstance.Streams.Error) {
-                $finishedJob.PowerShellInstance.Streams.Error.ReadAll()
+            $poshErr = [Collections.Generic.List[object]]::new()
+            if ($null -ne $finishedJob.PowerShellInstance.Streams.Error) {
+                foreach ( $e in $finishedJob.PowerShellInstance.Streams.Error.ReadAll() ) {
+                    $poshErr.Add($poshErr) | Out-Null
+                }
+            }
+            if ($null -ne $currentResults.Error) {
+                $poshErr.Add($currentResults.Error) | Out-Null
             }
             foreach ($i in $poshErr) {
                 Write-Warning "Unhandled Exception: $($i.Exception.Message)"

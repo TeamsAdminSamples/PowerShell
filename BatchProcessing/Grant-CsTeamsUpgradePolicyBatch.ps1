@@ -1,4 +1,4 @@
-#Requires -Modules @{ ModuleName = 'MicrosoftTeams'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9'; ModuleVersion = '1.1.6' }
+#Requires -Modules @{ ModuleName = 'MicrosoftTeams'; ModuleVersion = '1.1.6'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9' }
 
 <#
     .SYNOPSIS
@@ -25,7 +25,7 @@
 
 param(
     #  The name of the policy instance.
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [object]$PolicyName,
 
     # Specifies if Grant-CsTeamsMobilityPolicyBatch should be run with WhatIf switch, default is $true, set to $false to actually perform the change
@@ -413,7 +413,7 @@ foreach ($user in $users) {
                     UsersRemaining = $UsersRemaining
                     UsersCompleted = $UsersCompleted
                     Output = $Results
-                    Error = $_.Exception
+                    Error = $_
                 }
             } else {
                 # return non-finished users
@@ -422,7 +422,7 @@ foreach ($user in $users) {
                     UsersRemaining = $UsersRemaining
                     UsersCompleted = $UsersCompleted
                     Output = $Results
-                    Error = $_.Exception
+                    Error = $_
                 }
             }
             $Session | Remove-PSSession
@@ -522,8 +522,14 @@ $Session | Remove-PSSession
                 }
             }
 
-            $poshErr = if ($null -ne $finishedJob.PowerShellInstance.Streams.Error) {
-                $finishedJob.PowerShellInstance.Streams.Error.ReadAll()
+            $poshErr = [Collections.Generic.List[object]]::new()
+            if ($null -ne $finishedJob.PowerShellInstance.Streams.Error) {
+                foreach ( $e in $finishedJob.PowerShellInstance.Streams.Error.ReadAll() ) {
+                    $poshErr.Add($poshErr) | Out-Null
+                }
+            }
+            if ($null -ne $currentResults.Error) {
+                $poshErr.Add($currentResults.Error) | Out-Null
             }
             foreach ($i in $poshErr) {
                 Write-Warning "Unhandled Exception: $($i.Exception.Message)"
@@ -767,15 +773,16 @@ param($filterSB, $ArgHash)
 Get-CsOnlineUser -Filter $filterSB | Grant-CsTeamsUpgradePolicy @ArgHash
 '@)
 
-if ($null -eq $MigrateMeetingsToTeams -or $PolicyName -notin @('UpgradeToTeams','SfBWithTeamsCollabAndMeetings','SfBWithTeamsCollabAndMeetingsWithNotify')) {
-    # must be false if granted policy is any policy other than the above 3
-    $MigrateMeetingsToTeams = $false
-}
-
 $ArgHash = @{
     PolicyName = $PolicyName
-    MigrateMeetingsToTeams = $MigrateMeetingsToTeams
     WhatIf = $IsTest
+}
+if ($PolicyName -in @('UpgradeToTeams','SfBWithTeamsCollabAndMeetings','SfBWithTeamsCollabAndMeetingsWithNotify')) {
+    # must be false if granted policy is any policy other than the above 3
+    if ($null -eq $MigrateMeetingsToTeams) {
+        $MigrateMeetingsToTeams = $false
+    }
+    $ArgHash['MigrateMeetingsToTeams'] = $MigrateMeetingsToTeams
 }
 $BatchParams = @{
     FilterScript  = $FilterScript
