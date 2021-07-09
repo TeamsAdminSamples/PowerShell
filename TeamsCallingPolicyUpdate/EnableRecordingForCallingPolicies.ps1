@@ -1,4 +1,4 @@
-#Requires -Module @{ ModuleName = 'MicrosoftTeams'; RequiredVersion = '2.0.0' }
+#Requires -Module @{ ModuleName = 'MicrosoftTeams'; RequiredVersion = '2.3.1' }
 
 [CmdletBinding(DefaultParameterSetName = "Individual")]
 param (
@@ -18,7 +18,7 @@ param (
 )
 
 # Validate MicrosoftTeams module is connected, otherwise, connect
-if(![Microsoft.Teams.ConfigApi.Cmdlets.HostingEnvironmentProvider]::Instance.HasUserExecutedConnectCommand()) {
+if($null -eq [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider -or ![Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider.ClientAuthenticated()) {
     Connect-MicrosoftTeams
 }
 
