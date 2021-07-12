@@ -1,4 +1,4 @@
-#Requires -Modules @{ ModuleName = 'MicrosoftTeams'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9'; ModuleVersion = '2.3.1' }
+#Requires -Modules @{ ModuleVersion = '2.3.1'; ModuleName = 'MicrosoftTeams'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9' }
 
 <#
     .SYNOPSIS
@@ -63,17 +63,29 @@ function Get-CsOnlineSessionFromTokens {
     $Credential = [Management.Automation.PSCredential]::new("oauth", ($ConnectionInfo['AccessToken'] | ConvertTo-SecureString -AsPlainText -Force))
     $ConnectionUri = $ConnectionInfo['ConnectionUri']
 
+    if ((Get-Module -Name MicrosoftTeams).Version -gt [Version]::new("2.3.2")) {
+        $intCfgApiModVerCmd = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetCommandInfo(
+            [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetRootModule(), 
+            "Microsoft.Teams.ConfigAPI.Cmdlets.private", 
+            "Get-CsInternalConfigApiModuleVersion")
+        $intModVerCmd = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetCommandInfo(
+            [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetRootModule(), 
+            "Microsoft.TeamsCmdlets.PowerShell.Connect", 
+            "Get-CsInternalModuleVersion")
+    } else {
+        $intCfgApiModVerCmd = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetCmdletInfo(
+            [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetRootModule(), 
+            "Microsoft.Teams.ConfigAPI.Cmdlets.private", 
+            "Get-CsInternalConfigApiModuleVersion")
+        $intModVerCmd = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetCmdletInfo(
+            [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetRootModule(), 
+            "Microsoft.TeamsCmdlets.PowerShell.Connect", 
+            "Get-CsInternalModuleVersion")
+    }
+
     $Options = New-PSSessionOption -ApplicationArguments @{ 
-        "X-MS-Client-Version"                    = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetVersion(
-            [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetCmdletInfo(
-                [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetRootModule(), 
-                "Microsoft.Teams.ConfigAPI.Cmdlets.private", 
-                "Get-CsInternalConfigApiModuleVersion"))
-        "X-MS-MicrosoftTeamsModule-Version"      = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetVersion(
-            [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetCmdletInfo(
-                [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetRootModule(), 
-                "Microsoft.TeamsCmdlets.PowerShell.Connect", 
-                "Get-CsInternalModuleVersion"))
+        "X-MS-Client-Version"                    = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetVersion($intCfgApiModVerCmd)
+        "X-MS-MicrosoftTeamsModule-Version"      = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetVersion($intModVerCmd)
         "X-MS-CmdletsToExcludeFromImportSession" = [Microsoft.Teams.ConfigApi.Cmdlets.CmdletHostExtensions]::GetCmdletsToExcludeFromSfbOImportSession()
     }
 
@@ -91,10 +103,10 @@ function Get-TeamsTokens {
         [string]$TeamsEnvironmentName
     )
 
-    SetupShellDependencies
+    # SetupShellDependencies
     
     if($null -ne [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider -and [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider.ClientAuthenticated()) {
-        Write-Host "You already have an active TeamsPowerShell session, disconnecting..."
+        # clean up any existing connections to prevent token conflicts
         Disconnect-MicrosoftTeams
     }
 
@@ -195,8 +207,18 @@ function Get-TeamsTokens {
 
     $SessionState = [Microsoft.Teams.ConfigApi.Cmdlets.SessionStateStore]::Instance.GetSessionState()
     $AccessToken = $SessionState.AccessToken
-    $ForestHost = [uri][Microsoft.Teams.ConfigApi.Cmdlets.SfbOAutoDForestProvider]::Instance.GetForestUri($SessionState.AdministeredDomain, $SessionState.ConfigApiEnvironment)
-    $ConnectionUri = $SessionState.ConfigApiEndpoint.AbsoluteUri + "OcsPowershellOAuth/" + $ForestHost.Host + "?AdminDomain=" + $SessionState.AdministeredDomain
+    try {
+        $ForestHost = [uri][Microsoft.Teams.ConfigApi.Cmdlets.SfbOAutoDForestProvider]::Instance.GetForestUri($SessionState.AdministeredDomain, $SessionState.ConfigApiEnvironment)
+    }
+    catch {
+        Write-Error $_.Exception.Message
+    }
+    if ($null -ne $ForestHost) {
+        $ConnectionUri = $SessionState.ConfigApiEndpoint.AbsoluteUri + "OcsPowershellOAuth/" + $ForestHost.Host + "?AdminDomain=" + $SessionState.AdministeredDomain
+    } else {
+        Write-Warning "Unable to discover PowerShell Endpoint, exiting..."
+        exit
+    }
     $AccountId = $SessionState.UserName
     Disconnect-MicrosoftTeams
 
