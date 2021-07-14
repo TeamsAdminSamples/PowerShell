@@ -1,4 +1,4 @@
-#Requires -Modules @{ ModuleName = 'MicrosoftTeams'; ModuleVersion = '1.1.6'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9' }
+#Requires -Modules @{ ModuleVersion = '2.3.1'; ModuleName = 'MicrosoftTeams'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9' }
 
 <#
     .SYNOPSIS
@@ -55,53 +55,186 @@ param(
 
 function Get-CsOnlineSessionFromTokens {
     [cmdletbinding()]
-    param(
-        [hashtable]
-        $TeamsTokens
+    param (
+        $ConnectionInfo
     )
+
     SetupShellDependencies
-    Connect-MicrosoftTeams @TeamsTokens | Out-Null
-    New-CsOnlineSession
-    Disconnect-MicrosoftTeams
+
+    if ($null -eq $ConnectionInfo) {
+        $ConnectionInfo = Get-TeamsTokens
+    }
+    $Credential = [Management.Automation.PSCredential]::new("oauth", ($ConnectionInfo['AccessToken'] | ConvertTo-SecureString -AsPlainText -Force))
+    $ConnectionUri = $ConnectionInfo['ConnectionUri']
+
+    if ((Get-Module -Name MicrosoftTeams).Version -gt [Version]::new("2.3.2")) {
+        $intCfgApiModVerCmd = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetCommandInfo(
+            [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetRootModule(), 
+            "Microsoft.Teams.ConfigAPI.Cmdlets.private", 
+            "Get-CsInternalConfigApiModuleVersion")
+        $intModVerCmd = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetCommandInfo(
+            [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetRootModule(), 
+            "Microsoft.TeamsCmdlets.PowerShell.Connect", 
+            "Get-CsInternalModuleVersion")
+    } else {
+        $intCfgApiModVerCmd = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetCmdletInfo(
+            [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetRootModule(), 
+            "Microsoft.Teams.ConfigAPI.Cmdlets.private", 
+            "Get-CsInternalConfigApiModuleVersion")
+        $intModVerCmd = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetCmdletInfo(
+            [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetRootModule(), 
+            "Microsoft.TeamsCmdlets.PowerShell.Connect", 
+            "Get-CsInternalModuleVersion")
+    }
+
+    $Options = New-PSSessionOption -ApplicationArguments @{ 
+        "X-MS-Client-Version"                    = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetVersion($intCfgApiModVerCmd)
+        "X-MS-MicrosoftTeamsModule-Version"      = [Microsoft.Teams.ConfigApi.Cmdlets.PowershellUtils]::GetVersion($intModVerCmd)
+        "X-MS-CmdletsToExcludeFromImportSession" = [Microsoft.Teams.ConfigApi.Cmdlets.CmdletHostExtensions]::GetCmdletsToExcludeFromSfbOImportSession()
+    }
+
+    New-PSSession -ConnectionUri $ConnectionUri -Credential $Credential -Authentication Basic -Name "TeamsSession" -SessionOption $Options
 }
 
 function Get-TeamsTokens {
     [cmdletbinding()]
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $false)]
         [string]
         $UserName,
-        [Parameter(Mandatory=$false)]
+        [Parameter(Mandatory = $false)]
         [ValidateNotNullOrEmpty()]
         [string]$TeamsEnvironmentName
     )
 
-    # Add means to handle TeamsEnvironmentName (TeamsCloud, TeamsGCCH, TeamsDOD)
-    SetupShellDependencies
-    $TeamsEnvironmentParam = @{}
-    if (![string]::IsNullOrEmpty($TeamsEnvironmentName)) {
-        $TeamsEnvironmentParam['TeamsEnvironmentName'] = $TeamsEnvironmentName
+    # SetupShellDependencies
+    
+    if($null -ne [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider -and [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider.ClientAuthenticated()) {
+        # clean up any existing connections to prevent token conflicts
+        Disconnect-MicrosoftTeams
     }
-    Connect-MicrosoftTeams -AccountId $UserName @TeamsEnvironmentParam | Out-Null
-    $provider = [Microsoft.Open.Teams.CommonLibrary.TeamsPowerShellSession]::SessionProvider
-    $account = [Microsoft.Open.Teams.CommonLibrary.AzureAccount]::new()
-    $account.Type = [Microsoft.Open.Teams.CommonLibrary.AzureAccount+AccountType]::User
-    $account.Id = $UserName
-    $PromptBehavior = [Microsoft.Open.Teams.CommonLibrary.ShowDialog]::Auto
-    $tenantId = $provider.AccessTokens['AccessToken'].TenantId
-    $endpoint = [Microsoft.Open.Teams.CommonLibrary.Endpoint]::AadGraphEndpointResourceId
-    $aadToken = $provider.AuthenticationFactory.Authenticate($account, $provider.AzureEnvironment, $tenantId, $null, $PromptBehavior, $null, $provider.TokenCache, $endpoint)
-    $endpoint = [Microsoft.Open.Teams.CommonLibrary.Endpoint]::MsGraphEndpointResourceId
-    $msToken = $provider.AuthenticationFactory.Authenticate($account, $provider.AzureEnvironment, $tenantId, $null, $PromptBehavior, $null, $provider.TokenCache, $endpoint)
-    $endpoint = [Microsoft.Open.Teams.CommonLibrary.Endpoint]::ConfigApiEndpointResourceId
-    $configToken = $provider.AuthenticationFactory.Authenticate($account, $provider.AzureEnvironment, $tenantId, $null, $PromptBehavior, $null, $provider.TokenCache, $endpoint)
+
+    if ($null -ne $MyInvocation.MyCommand)
+    {
+        [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModulePreReleaseVersion = $null
+        if ($null -ne $MyInvocation.MyCommand.Module.Name) {
+            [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModuleName = $MyInvocation.MyCommand.Module.Name
+        } else {
+            [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModuleName = "MicrosoftTeams"
+        }
+        if ($null -ne $MyInvocation.MyCommand.Module.Version) {
+            [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModuleVersion = $MyInvocation.MyCommand.Module.Version.ToString()
+        } else {
+            [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModuleVersion = "0.0.0.0"
+        }
+    }
+
+    if (![string]::IsNullOrEmpty($TeamsEnvironmentName)) {
+        $AzureEnvironmentName = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.TeamsEnvironment]::GetAzureEnvironmentName($TeamsEnvironmentName)
+        if ([Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile.Environments.ContainsKey($AzureEnvironmentName)) {
+			$AzureEnvironment = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile.Environments[$AzureEnvironmentName]
+		}
+        [Microsoft.TeamsCmdlets.Powershell.Connect.Models.TeamsEnvironment]::setMsGraphEndPoint($TeamsEnvironmentName, $AzureEnvironment)
+    } else {
+        $AzureEnvironmentName = 0
+        if ([Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile.Environments.ContainsKey($AzureEnvironmentName)) {
+			$AzureEnvironment = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile.Environments[$AzureEnvironmentName]
+		}
+    }
+
+    if ($null -eq [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider) {
+        if (![string]::IsNullOrEmpty($TenantId)){
+            [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureSessionProvider]::new($AzureEnvironment, $null, $TenantId)
+        } else {
+            [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureSessionProvider]::new($AzureEnvironment)
+        }
+    }
+
+    $AuthFlow = [Microsoft.TeamsCmdlets.Powershell.Connect.Enum.AuthenticationFlow]::Interactive
+    $AzureAccount = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureAccount]::new()
+    $AzureAccount.Type = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureAccount+AccountType]::User
+
+    if (![string]::IsNullOrEmpty($UserName)) {
+        $AzureAccount.Id = $UserName
+    }
+
+    if (![string]::IsNullOrEmpty($TenantId)) {
+        $AzureAccount.SetProperty([Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureAccount+Property]::Tenants, $TenantId)
+    }
+    if ($null -eq [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile) {
+        [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRMProfile]::new()
+    }
+    $profileClient = [Microsoft.TeamsCmdlets.Powershell.Connect.RMProfileClient]::new([Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile, [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider)
+
+
+    # this is different in 2.3.2 from 2.3.1
+    if ($null -eq [Microsoft.TeamsCmdlets.Powershell.Connect.Common.Endpoint]::AadGraphEndpointResourceId) {
+        $ResourceId = [Microsoft.TeamsCmdlets.Powershell.Connect.Common.Endpoint]::MsGraphEndpointResourceId 
+    } else {
+        $ResourceId = [Microsoft.TeamsCmdlets.Powershell.Connect.Common.Endpoint]::AadGraphEndpointResourceId 
+    }
+    $Resource = [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::GetResource($ResourceId) 
+    
+    $Scopes = $null
+
+    $moduleConfig = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.ModuleConfiguration]::new()
+    $moduleConfig.AdEndpoint = $AzureEnvironment.Endpoints[[Microsoft.TeamsCmdlets.Powershell.Connect.Common.Endpoint]::ActiveDirectory]
+    $moduleConfig.ResourceClientUri = $AzureEnvironment.Endpoints[$ResourceId]
+    $moduleConfig.AdDomain = $TenantId
+    $moduleConfig.ValidateAuthority = !$AzureEnvironment.OnPremise
+
+    if ($null -eq $Scopes) {
+        $Scopes = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.ModuleConfiguration]::DefaultScopesForGraphAPI
+    }
+
+    $MsalTokenProvider = [Microsoft.TeamsCmdlets.Powershell.Connect.TokenProvider.MsalTokenProvider]::new()
+    # to ensure proper type loading for Teams
+    $Prompt = [Microsoft.Identity.Client.Prompt, Microsoft.Identity.Client, Version=4.29.0.0, Culture=neutral, PublicKeyToken=0a613f4dd989e8ae]::NoPrompt
+    $result = [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::PublicClientApplication.AcquireTokenInteractive($Scopes).WithLoginHint($AzureAccount.Id).WithPrompt($Prompt).ExecuteAsync().Result
+    $GraphToken = [Microsoft.TeamsCmdlets.PowerShell.Connect.TokenProvider.MsalAccessToken]::new($result, $MsalTokenProvider, $moduleConfig)
+
+    $resourceKey = [Microsoft.TeamsCmdlets.PowerShell.Connect.TokenProvider.AccessTokenCache]::GetResourceKey($Resource, [Microsoft.TeamsCmdlets.Powershell.Connect.Models.ModuleConfiguration]::DefaultScopesForGraphAPI)
+    [Microsoft.TeamsCmdlets.PowerShell.Connect.TokenProvider.AccessTokenCache]::AccessTokens[$resourceKey] = $GraphToken
+    $AzureTenant = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureTenant]::new()
+    $id = [Guid]::Empty
+    if ([Guid]::TryParse($GraphToken.TenantId, [ref] $id)) {
+        $AzureTenant.Id = $id
+    } else {
+        $AzureTenant.Domain = $GraphToken.TenantId
+    }
+    
+    [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile.Context = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureContext]::new($AzureAccount, $AzureEnvironment, $AzureTenant)
+    [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::AzureRMProfile = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile
+
+    [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::TeamsEnvironmentName = $TeamsEnvironmentName
+    [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::InputTenantId = $TenantId
+
+    $SessionState = [Microsoft.Teams.ConfigApi.Cmdlets.SessionStateStore]::Instance.GetSessionState()
+    $AccessToken = $SessionState.AccessToken
+    try {
+        $ForestHost = [uri][Microsoft.Teams.ConfigApi.Cmdlets.SfbOAutoDForestProvider]::Instance.GetForestUri($SessionState.AdministeredDomain, $SessionState.ConfigApiEnvironment)
+    }
+    catch {
+        Write-Error $_.Exception.Message
+    }
+    if ($null -ne $ForestHost) {
+        $ConnectionUri = $SessionState.ConfigApiEndpoint.AbsoluteUri + "OcsPowershellOAuth/" + $ForestHost.Host + "?AdminDomain=" + $SessionState.AdministeredDomain
+    } else {
+        Write-Warning "Unable to discover PowerShell Endpoint, exiting..."
+        exit
+    }
+    $AccountId = $SessionState.UserName
     Disconnect-MicrosoftTeams
 
+    $jwt = ParseJWT -EncodedJWT $AccessToken
+    if ($null -ne $jwt.upn -and ($jwt.upn -ne $AccountId -or $jwt.upn -ne $UserName)) {
+        Write-Host "Token was issued for $($jwt.upn) not the requested $UserName"
+    }
+
     @{
-        AccountId = $UserName
-        AadAccessToken = $aadToken.AccessToken
-        MsAccessToken = $msToken.AccessToken
-        ConfigAccessToken = $configToken.AccessToken
+        AccountId     = $AccountId
+        AccessToken   = $AccessToken
+        ConnectionUri = $ConnectionUri
     }
 }
 
@@ -208,7 +341,6 @@ function Invoke-CsOnlineBatch {
 
     Write-Log -Level Info -Path $LogFile -Message "##################################################"
     Write-Log -Level Info -Path $LogFile -Message "Accounts used: $($UserName.Length)"
-    Write-Log -Level Info -Path $LogFile -Message "OverrideAdminDomain: $OverrideAdminDomain"
     Write-Log -Level Info -Path $LogFile -Message "UsersFilePath: $(if([string]::IsNullOrWhiteSpace($UsersFilePath)){$null}else{Resolve-Path $UsersFilePath})"
     Write-Log -Level Info -Path $LogFile -Message "FilterScript: {$($FilterScript.ToString())}"
     Write-Log -Level Info -Path $LogFile -Message "JobScript: {$($JobScript.ToString())}"
@@ -275,12 +407,11 @@ function Invoke-CsOnlineBatch {
             Write-Log -Level Info -Message "Attempting to create session $($i+1)" -Path $LogFile
             $NewSession = $null
             try {
-                $NewSession = Get-CsOnlineSessionFromTokens -TeamsTokens $Token -ErrorAction Stop
+                $NewSession = Get-CsOnlineSessionFromTokens -ConnectionInfo $Token -ErrorAction Stop
             }
             catch { 
-                Write-Warning "Unable to create session: $($_.Exception.Message)" 
-                Write-Log -Level Warn -Message "Unable to create session: $($_.Exception.Message)" -Path $LogFile
-                
+                Write-Warning "Unable to create session for ${adminUser}: $($_.Exception.Message)" 
+                Write-Log -Level Warn -Message "Unable to create session for ${adminUser}: $($_.Exception.Message)" -Path $LogFile
             }
             if ($null -ne $NewSession) {
                 $Sessions += [Collections.Generic.KeyValuePair[string, Management.Automation.Runspaces.PSSession]]::new($adminUser, $NewSession)
@@ -323,7 +454,8 @@ function Invoke-CsOnlineBatch {
             $FilterScript = [ScriptBlock]::Create('TeamsUpgradePolicy -eq $null -and Enabled -eq $true')
         }
         $MainSession = $Sessions[0].Value
-        $users = Invoke-Command -Session $MainSession -ScriptBlock { Get-CsOnlineUser -Filter $using:FilterScript } | Select-Object -ExpandProperty UserPrincipalName | Sort-Object -Unique
+        $users = Invoke-Command -Session $MainSession -ScriptBlock { Get-CsOnlineUser -Filter $using:FilterScript } | 
+            Where-Object { $_.InterpretedUserType -match 'Teams(Only)?User' } | Select-Object -ExpandProperty UserPrincipalName | Sort-Object -Unique
     }
 
     Write-Host "Found $($Users.Count) users"
@@ -351,11 +483,10 @@ param(
     $users,
     $ExpirationOffsetMinutes,
     $OAuthToken,
-    $OverrideAdminDomain,
     $RemoteScript,
     [Object[]] $OtherArgs
 )
-Import-Module -Name MicrosoftTeams -RequiredVersion 1.1.6 -ErrorAction Stop -InformationVariable $null
+Import-Module -Name MicrosoftTeams -ErrorAction Stop -InformationVariable $null
 
 $RemoteScript = [ScriptBlock]::Create($RemoteScript.ToString())
 
@@ -373,7 +504,7 @@ if (IsExpired $OAuthToken $ExpirationOffsetMinutes) {
     exit
 }
 
-$Session = Get-CsOnlineSessionFromTokens -TeamsTokens $OAuthToken -ErrorAction Stop
+$Session = Get-CsOnlineSessionFromTokens -ConnectionInfo $OAuthToken -ErrorAction Stop
 $filter = [Text.StringBuilder]::new()
 $count = 0
 $Results = [Collections.Generic.List[object]]::new()
@@ -472,7 +603,6 @@ $Session | Remove-PSSession
             users                   = $Batches[$i]
             ExpirationOffsetMinutes = $ExpirationOffsetMinutes
             OAuthToken              = $authToken
-            OverrideAdminDomain     = $OverrideAdminDomain
             RemoteScript            = $JobScript.ToString()
             OtherArgs               = $OtherArgs
         }
@@ -516,7 +646,7 @@ $Session | Remove-PSSession
             }
             foreach ($i in $Info) {
                 if (![string]::IsNullOrWhiteSpace($i.MessageData)) {
-                    if ($i.Source -match 'Microsoft\.Teams\.Config\.psm1$') { continue }
+                    if ($i.Source -match 'Microsoft\.Teams\.Config') { continue }
                     Write-Host "Job $($i.ManagedThreadId) at $($i.TimeGenerated): $($i.MessageData)"
                     Write-Log -Level Info -Message "Job $($i.ManagedThreadId) at $($i.TimeGenerated): $($i.MessageData)" -Path $LogFile
                 }
@@ -540,7 +670,7 @@ $Session | Remove-PSSession
                 }
                 $inner = $i.Exception.InnerException
                 while ($null -ne $inner) {
-                    Write-Error "Inner Exception: $($inner.Message)"
+                    Write-Warning "Inner Exception: $($inner.Message)"
                     Write-Log -Level Error -Message "Inner Exception: $($inner.Message)" -Path $LogFile
                     $inner = $inner.InnerException
                 }
@@ -580,7 +710,6 @@ $Session | Remove-PSSession
                         users                   = $currentResults.UsersRemaining
                         ExpirationOffsetMinutes = $ExpirationOffsetMinutes
                         OAuthToken              = $currentToken
-                        OverrideAdminDomain     = $OverrideAdminDomain
                         RemoteScript            = $JobScript.ToString()
                         OtherArgs               = $OtherArgs
                     }
@@ -598,17 +727,9 @@ $Session | Remove-PSSession
                     $RunningJobs += $newJob
                 }
             }
-            elseif ($null -ne $currentResults.Error) {
-                if ($null -ne $currentResult.Error.Message) {
-                    Write-Error "Job failed with $(@($currentResults.UsersRemaining).Count) users left in run.`r`nException: $($currentResults.Error.Message)"
-                    Write-Log -Level Error -Message "Job failed with $(@($currentResults.UsersRemaining).Count) users left in run.`r`nException: $($currentResults.Error.Message)" -Path $LogFile
-                    $inner = $currentResults.Error.InnerException
-                    while ($null -ne $inner) {
-                        Write-Error "Inner Exception: $($inner.Message)"
-                        Write-Log -Level Error -Message "Inner Exception: $($inner.Message)" -Path $LogFile
-                        $inner = $inner.InnerException
-                    }
-                }
+            elseif ($poshErr.Count -gt 0) {
+                Write-Error "Job failed with $(@($currentResults.UsersRemaining).Count) users left in run."
+                Write-Log -Level Error -Message "Job failed with $(@($currentResults.UsersRemaining).Count) users left in run." -Path $LogFile
                 WriteRemaining $currentResults.UsersRemaining
             }
 
@@ -660,11 +781,7 @@ function IsExpired {
     )
     if ($PSCmdlet.ParameterSetName -eq "Hash") {
         # return true if any are expired
-        if ((IsExpired $TokenHash['AadAccessToken'] -OffsetMinutes $OffsetMinutes)) {
-            $true
-        } elseif ((IsExpired $TokenHash['MsAccessToken'] -OffsetMinutes $OffsetMinutes)) {
-            $true
-        } elseif ((IsExpired $TokenHash['ConfigAccessToken'] -OffsetMinutes $OffsetMinutes)) {
+        if ((IsExpired $TokenHash['AccessToken'] -OffsetMinutes $OffsetMinutes)) {
             $true
         } else {
             $false
@@ -679,8 +796,7 @@ function IsExpired {
             else {
                 $result = [System.Net.NetworkCredential]::new('', $SecureToken).Password
             }
-            $jwtString = $result.Split('.')[1]
-            $jwt = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String((PadBase64String $jwtString))) | ConvertFrom-Json
+            $jwt = ParseJWT -EncodedJWT $result
             [DateTime]::Now.AddMinutes($OffsetMinutes) -gt [DateTime]::new(1970, 1, 1, 0, 0, 0, [DateTimeKind]::Utc).AddSeconds($jwt.exp).ToLocalTime()
         }
         $IsExpired
@@ -695,19 +811,21 @@ function PadBase64String([string] $stringToPad) {
     $stringToPad + [String]::new("=",$PaddingLength)
 }
 
+function ParseJWT ([string] $EncodedJWT) {
+    $jwtString = $EncodedJWT.Split('.')[1]
+    [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String((PadBase64String $jwtString))) | ConvertFrom-Json
+}
+
 function SetupShellDependencies {
-    $sp = $null
+    $sessionstate = $null
     $err = $null
-    try { $sp = [Microsoft.Open.Teams.CommonLibrary.TeamsPowerShellSession]::SessionProvider } catch { $err = $_.FullyQualifiedErrorId }
-    try { $sp = [Microsoft.Open.Teams.CommonLibrary.AzureAccount]::new() } catch { $err = $_.FullyQualifiedErrorId }
+    # try { Import-Module -Name MicrosoftTeams -ErrorAction Stop } catch { $err = $_.FullyQualifiedErrorId }
+    try { $sessionstate = [Microsoft.Teams.ConfigApi.Cmdlets.SessionStateStore]::Instance } catch { $err = $_.FullyQualifiedErrorId }
     if ($null -ne $err) {
-        $err = $null
-        try { $sp = [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider } catch { $err = $_.FullyQualifiedErrorId }
-        if ($null -ne $err) {
-            throw "MicrosoftTeams module is either too old or not loaded, Ensure version 1.1.6 is the only loaded version before running!"
-        } else {
-            throw "MicrosoftTeams module is updated beyond the supported version for this script. Ensure version 1.1.6 is the only loaded version before running!"
-        }
+        throw "MicrosoftTeams module is either too old or not loaded, Ensure version 2.3.1 or later is the only loaded version before running!"
+    }
+    elseif($null -eq $sessionstate) {
+        throw "MicrosoftTeams module is updated beyond the supported version for this script. Ensure version 1.1.6 is the only loaded version before running!"
     }
 }
 
@@ -779,10 +897,9 @@ $ArgHash = @{
 }
 if ($PolicyName -in @('UpgradeToTeams','SfBWithTeamsCollabAndMeetings','SfBWithTeamsCollabAndMeetingsWithNotify')) {
     # must be false if granted policy is any policy other than the above 3
-    if ($null -eq $MigrateMeetingsToTeams) {
-        $MigrateMeetingsToTeams = $false
+    if ($MigrateMeetingsToTeams) {
+        $ArgHash['MigrateMeetingsToTeams'] = $MigrateMeetingsToTeams
     }
-    $ArgHash['MigrateMeetingsToTeams'] = $MigrateMeetingsToTeams
 }
 $BatchParams = @{
     FilterScript  = $FilterScript
