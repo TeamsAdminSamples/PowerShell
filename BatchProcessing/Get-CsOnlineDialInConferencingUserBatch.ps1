@@ -1,4 +1,4 @@
-#Requires -Modules @{ ModuleVersion = '2.3.1'; ModuleName = 'MicrosoftTeams'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9' }
+#Requires -Modules @{ GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9'; ModuleVersion = '2.3.1'; ModuleName = 'MicrosoftTeams' }
 
 <#
     .SYNOPSIS
@@ -97,7 +97,7 @@ function Get-TeamsTokens {
         [string]$TeamsEnvironmentName
     )
 
-    # SetupShellDependencies
+    SetupShellDependencies
     
     if($null -ne [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider -and [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider.ClientAuthenticated()) {
         # clean up any existing connections to prevent token conflicts
@@ -140,7 +140,6 @@ function Get-TeamsTokens {
         }
     }
 
-    $AuthFlow = [Microsoft.TeamsCmdlets.Powershell.Connect.Enum.AuthenticationFlow]::Interactive
     $AzureAccount = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureAccount]::new()
     $AzureAccount.Type = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureAccount+AccountType]::User
 
@@ -154,8 +153,7 @@ function Get-TeamsTokens {
     if ($null -eq [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile) {
         [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile = [Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRMProfile]::new()
     }
-    $profileClient = [Microsoft.TeamsCmdlets.Powershell.Connect.RMProfileClient]::new([Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile, [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider)
-
+    [Microsoft.TeamsCmdlets.Powershell.Connect.RMProfileClient]::new([Microsoft.TeamsCmdlets.Powershell.Connect.Models.AzureRmProfileProvider]::Instance.Profile, [Microsoft.TeamsCmdlets.Powershell.Connect.TeamsPowerShellSession]::SessionProvider) | Out-Null
 
     # this is different in 2.3.2 from 2.3.1
     if ($null -eq [Microsoft.TeamsCmdlets.Powershell.Connect.Common.Endpoint]::AadGraphEndpointResourceId) {
@@ -809,7 +807,7 @@ function ParseJWT ([string] $EncodedJWT) {
 function SetupShellDependencies {
     $sessionstate = $null
     $err = $null
-    # try { Import-Module -Name MicrosoftTeams -ErrorAction Stop } catch { $err = $_.FullyQualifiedErrorId }
+    try { Import-Module -Name MicrosoftTeams -ErrorAction Stop } catch { $err = $_.FullyQualifiedErrorId }
     try { $sessionstate = [Microsoft.Teams.ConfigApi.Cmdlets.SessionStateStore]::Instance } catch { $err = $_.FullyQualifiedErrorId }
     if ($null -ne $err) {
         throw "MicrosoftTeams module is either too old or not loaded, Ensure version 2.3.1 or later is the only loaded version before running!"

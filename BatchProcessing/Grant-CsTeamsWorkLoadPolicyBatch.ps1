@@ -2,10 +2,10 @@
 
 <#
     .SYNOPSIS
-    Grants the given IPPhonePolicy
+    Grants the given TeamsWorkLoadPolicy
     
     .DESCRIPTION
-    Grants the given IPPhonePolicy for all users enabled or from a user provided list.
+    Grants the given TeamsWorkLoadPolicy for all users enabled or from a user provided list.
     It will run with multiple sessions from multiple administrator accounts as desired to increase parallelization.
 
     .INPUTS
@@ -15,11 +15,11 @@
     None. This script fully executes the process and outputs nothing to the pipeline. All console interaction is informational only.
 
     .EXAMPLE
-    Grant-CsIPPhonePolicyBatch -UserName admin1@contoso.com, admin2@contoso.com -PolicyName $null -IsTest $false
+    Grant-CsTeamsWorkLoadPolicyBatch -UserName admin1@contoso.com, admin2@contoso.com -PolicyName $null -IsTest $false
     This runs a policy update for all enabled users in the tenant leveraging 2 administrator accounts for a maximum of 6 concurrent sessions
 
     .EXAMPLE
-    Grant-CsIPPhonePolicyBatch -UserName admin1@contoso.com -PolicyName $null -UsersFilePath .\userstomigrate.txt
+    Grant-CsTeamsWorkLoadPolicyBatch -UserName admin1@contoso.com -PolicyName $null -UsersFilePath .\userstomigrate.txt
     This runs a test policy grant for the users listed in .\userstomigrate.txt using 1 administrator account
 #>
 
@@ -27,7 +27,7 @@ param(
     #  The name of the policy instance.
     [string]$PolicyName,
 
-    # Specifies if Grant-CsIPPhonePolicyBatch should be run with WhatIf switch, default is $true, set to $false to actually perform the change
+    # Specifies if Grant-CsTeamsWorkLoadPolicyBatch should be run with WhatIf switch, default is $true, set to $false to actually perform the change
     [bool]$IsTest = $true,
 
     # Specifies the admin user names used to open SkypeOnline PowerShell sessions
@@ -869,9 +869,9 @@ function Write-Log {
 
 $LogFolderPath = Resolve-Path $LogFolderPath
 $LogDate = Get-Date -Format "yyyyMMdd_HHmmss"
-$LogFile = "$LogFolderPath\CsIPPhonePolicyBatch_$LogDate.log"
+$LogFile = "$LogFolderPath\CsTeamsWorkLoadPolicyBatch_$LogDate.log"
 
-Write-Log -Level Info -Path $LogFile -Message "Grant-CsIPPhonePolicyBatch"
+Write-Log -Level Info -Path $LogFile -Message "Grant-CsTeamsWorkLoadPolicyBatch"
 
 if ($IsTest) {
     $IsTestWarning = "This is running as a test. Please add -IsTest `$false to your command in order to actually perform this action."
@@ -882,7 +882,7 @@ if ($IsTest) {
 $FilterScript = [ScriptBlock]::Create('Enabled -eq $true')
 $JobScript = [ScriptBlock]::Create(@'
 param($filterSB, $ArgHash)
-Get-CsOnlineUser -Filter $filterSB | Grant-CsIPPhonePolicy @ArgHash
+Get-CsOnlineUser -Filter $filterSB | Grant-CsTeamsWorkLoadPolicy @ArgHash
 '@)
 
 $ArgHash = @{
