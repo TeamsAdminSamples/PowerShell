@@ -1,4 +1,4 @@
-#Requires -Modules @{ GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9'; ModuleVersion = '2.3.1'; ModuleName = 'MicrosoftTeams' }
+#Requires -Modules @{ ModuleName = 'MicrosoftTeams'; GUID = 'd910df43-3ca6-4c9c-a2e3-e9f45a8e2ad9'; ModuleVersion = '2.3.1' }
 
 <#
     .SYNOPSIS
@@ -114,19 +114,14 @@ function Get-TeamsTokens {
         Disconnect-MicrosoftTeams
     }
 
-    if ($null -ne $MyInvocation.MyCommand)
-    {
-        [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModulePreReleaseVersion = $null
-        if ($null -ne $MyInvocation.MyCommand.Module.Name) {
-            [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModuleName = $MyInvocation.MyCommand.Module.Name
-        } else {
-            [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModuleName = "MicrosoftTeams"
-        }
-        if ($null -ne $MyInvocation.MyCommand.Module.Version) {
-            [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModuleVersion = $MyInvocation.MyCommand.Module.Version.ToString()
-        } else {
-            [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModuleVersion = "0.0.0.0"
-        }
+    $Module = Get-Module -Name MicrosoftTeams -ErrorAction SilentlyContinue
+
+    [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModulePreReleaseVersion = $null
+    [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModuleName = "MicrosoftTeams"
+    if ($null -ne $Module.Version) {
+        [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModuleVersion = $Module.Version.ToString()
+    } else {
+        [Microsoft.TeamsCmdlets.Powershell.Connect.Common.CmdletVersion]::ModuleVersion = "0.0.0.0"
     }
 
     if (![string]::IsNullOrEmpty($TeamsEnvironmentName)) {
@@ -453,7 +448,7 @@ function Invoke-CsOnlineBatch {
         }
         $MainSession = $Sessions[0].Value
         $users = Invoke-Command -Session $MainSession -ScriptBlock { Get-CsOnlineUser -Filter $using:FilterScript } | 
-            Where-Object { $_.InterpretedUserType -match 'Teams(Only)?User' } | Select-Object -ExpandProperty UserPrincipalName | Sort-Object -Unique
+            Where-Object { $_.InterpretedUserType -match '(Teams(Only)?User|OnlineSfBUser)' } | Select-Object -ExpandProperty UserPrincipalName | Sort-Object -Unique
     }
 
     Write-Host "Found $($Users.Count) users"
