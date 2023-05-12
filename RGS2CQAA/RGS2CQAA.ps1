@@ -1388,18 +1388,6 @@ foreach ($Workflow in $CallQueues) {
     $null = $CommandText.AppendLine('        $Config.DeploymentStatus = $DeploymentStatus')
     $null = $CommandText.AppendLine('        $Config | Export-Csv -Path $CsvPath -NoTypeInformation')
     $null = $CommandText.AppendLine('    }')
-    # pretty sure we have to licence both endpoints now, but unsure...
-    $null = $CommandText.AppendLine('    try {')
-    $null = $CommandText.AppendLine('        Set-MgUserLicense -UserId $CQInstanceId -AddLicenses @($License) -RemoveLicenses @() -ErrorAction Stop')
-    $null = $CommandText.AppendLine('    } catch {')
-    $null = $CommandText.AppendLine('        Write-Warning "Unable to apply license plan to $CQInstanceId, you will need to do this manually."')
-    $null = $CommandText.AppendLine('        Write-Warning $_.Exception')
-    $null = $CommandText.AppendLine('        exit')
-    $null = $CommandText.AppendLine('    } finally {')
-    $null = $CommandText.AppendLine('        $DeploymentStatus = ''WorkflowDeployed''')
-    $null = $CommandText.AppendLine('        $Config.DeploymentStatus = $DeploymentStatus')
-    $null = $CommandText.AppendLine('        $Config | Export-Csv -Path $CsvPath -NoTypeInformation')
-    $null = $CommandText.AppendLine('    }')
     $null = $CommandText.AppendLine('}')
 
     if (![string]::IsNullOrEmpty($LineURI)) {
