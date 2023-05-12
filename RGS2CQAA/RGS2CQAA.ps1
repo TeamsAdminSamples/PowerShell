@@ -1,51 +1,30 @@
-[cmdletbinding(DefaultParameterSetName = "Online")]
+[CmdletBinding()]
 
 param(
-    [Parameter(ParameterSetName = "Online",
-        Mandatory = $true)]
-    [Parameter(ParameterSetName = "OnPrem",
-        Mandatory = $true)]
+    [Parameter(Mandatory)]
     [string]
     $RGSExportPath,
-    
-    [Parameter(ParameterSetName = "Online",
-        Mandatory = $true)]
-    [Parameter(ParameterSetName = "OnPrem",
-        Mandatory = $true)]
+
+    [Parameter(Mandatory)]
     [string]
     $SipDomain,
 
-    [Parameter(ParameterSetName = "OnPrem",
-        Mandatory = $true)]
-    [switch]
-    $GenerateAccountsOnPrem,
-
-    # OU for hybrid object creation
-    [Parameter(ParameterSetName = "OnPrem",
-        Mandatory = $true)]
-    [string]
-    $ResourceOU,
-
     # Default Usage Location
-    [Parameter(ParameterSetName = "Online",
-        Mandatory = $false)]
-    [Parameter(ParameterSetName = "OnPrem",
-        Mandatory = $false)]
+    [Parameter()]
     [string]
-    $UsageLocation = "US"
+    $UsageLocation = 'US'
 )
 
 # TODO: add lines for required modules
-#       need: Get-AzureADUser
+#       need: Microsoft.Graph.Users, Microsoft.Graph.Identity.DirectoryManagement, Microsoft.Graph.Users.Actions
 #       need: MicrosoftTeams
-#       need: SfBServer if $GenerateAccountsOnPrem
 
 # TODO: Add switch for phone number assignment
 # TODO: how to handle DR vs Service Number in addition to Hybrid vs Online accounts
 
 $GeneratedScriptsPath = [IO.Path]::Combine($RGSExportPath, 'GeneratedScripts')
 if (!(Test-Path -Path $GeneratedScriptsPath)) {
-    New-Item -Path $GeneratedScriptsPath -ItemType Directory | Out-Null
+    $null = New-Item -Path $GeneratedScriptsPath -ItemType Directory
 }
 
 $Files = Get-ChildItem -Path $RGSExportPath -Filter *.zip
@@ -58,7 +37,7 @@ foreach ($file in $Files.Name) {
         Expand-Archive -Path $Source -DestinationPath $Destination -Force
     }
 
-    $RgsFilesPath = [IO.Path]::Combine($Destination, "RgsImportExport")
+    $RgsFilesPath = [IO.Path]::Combine($Destination, 'RgsImportExport')
     $RgsFiles = Get-ChildItem -Path $RgsFilesPath -Filter *.xml -File
     foreach ($RgsFile in $RgsFiles) {
         $FileName = $RgsFile.BaseName
@@ -85,10 +64,10 @@ function RoundValue {
         [int]$RoundTo = 15,
         [int]$MaximumTime = 180
     )
-    if ([string]::IsNullOrEmpty($InputTime) -or $InputTime -lt $MinimumTime) { 
+    if ([string]::IsNullOrEmpty($InputTime) -or $InputTime -lt $MinimumTime) {
         [int]$MinimumTime
     }
-    else { 
+    else {
         [int][Math]::Min(([Math]::Ceiling($InputTime / $RoundTo) * $RoundTo), $MaximumTime)
     }
 }
@@ -106,14 +85,14 @@ function WriteDisconnectAction {
         [int]
         $NumTabs = 0,
         [string]
-        $Prepend = ""
+        $Prepend = ''
     )
-    $Tabs = [string]::new("`t", $NumTabs)
+    $Tabs = [string]::new(' ', $NumTabs * 4)
     if ($AAMenuOption) {
-        $CommandText.AppendLine("$Prepend$Tabs`$$CommandHashName[`"Action`"] = `"DisconnectCall`"") | Out-Null
+        $null = $CommandText.AppendLine("$Prepend$Tabs`$$CommandHashName['Action'] = 'DisconnectCall'")
     }
     else {
-        $CommandText.AppendLine("$Prepend$Tabs`$$CommandHashName[`"$ActionName`"] = `"Disconnect`"") | Out-Null
+        $null = $CommandText.AppendLine("$Prepend$Tabs`$$CommandHashName['$ActionName'] = 'Disconnect'")
     }
 }
 
@@ -132,40 +111,40 @@ function ConvertNonQuestionAction {
         $ActionName,
         [string]
         $ActionTargetName,
-        [Parameter(ParameterSetName = "AA")]
+        [Parameter(ParameterSetName = 'AA')]
         [switch]
         $AAMenuOption,
-        [Parameter(ParameterSetName = "CQ")]
+        [Parameter(ParameterSetName = 'CQ')]
         [string]
         $AudioFilePromptLocation,
-        [Parameter(ParameterSetName = "CQ")]
+        [Parameter(ParameterSetName = 'CQ')]
         [string]
         $AudioFilePromptOriginalName,
-        [Parameter(ParameterSetName = "CQ")]
+        [Parameter(ParameterSetName = 'CQ')]
         [string]
         $TextPrompt,
-        [Parameter(ParameterSetName = "CQ")]
+        [Parameter(ParameterSetName = 'CQ')]
         [string]
         $AudioPromptParamName,
-        [Parameter(ParameterSetName = "CQ")]
+        [Parameter(ParameterSetName = 'CQ')]
         [string]
         $TextPromptParamName,
         [string]
-        $Prepend = ""
+        $Prepend = ''
     )
     <#
         AudioFilePromptLocation     = $DefaultQueue.OverflowAudioStoredLocation
         AudioFilePromptOriginalName = $DefaultQueue.OverflowAudioOriginalName
         TextPrompt                  = $DefaultQueue.OverflowTextPrompt
-        AudioPromptParamName        = "OverflowSharedVoicemailAudioFilePrompt"
-        TextPromptParamName         = "OverflowSharedVoicemailTextToSpeechPrompt"
+        AudioPromptParamName        = 'OverflowSharedVoicemailAudioFilePrompt'
+        TextPromptParamName         = 'OverflowSharedVoicemailTextToSpeechPrompt'
     #>
     $WarningStrings = [Text.StringBuilder]::new()
     switch ($Action) {
-        "Terminate" {
+        'Terminate' {
             WriteDisconnectAction -CommandText $CommandText -CommandHashName $CommandHashName -ActionName $ActionName -AAMenuOption:$AAMenuOption -Prepend $Prepend
         }
-        "TransferToPstn" {
+        'TransferToPstn' {
             if ([string]::IsNullOrEmpty($URI)) {
                 WriteDisconnectAction -CommandText $CommandText -CommandHashName $CommandHashName -ActionName $ActionName -AAMenuOption:$AAMenuOption -Prepend $Prepend
             }
@@ -175,113 +154,113 @@ function ConvertNonQuestionAction {
                 $URI = 'tel:+' + [regex]::Replace($URI, '[^0-9x]', '')
                 $URI = [regex]::Replace($URI, 'x', ';ext=')
                 if ($AAMenuOption) {
-                    $CommandText.AppendLine("$Prepend`$CallableEntity = New-CsAutoAttendantCallableEntity -Identity `"$URI`" -Type ExternalPstn") | Out-Null
-                    $CommandText.AppendLine("$Prepend`$$CommandHashName[`"Action`"] = `"TransferCallToTarget`"") | Out-Null
-                    $CommandText.AppendLine("$Prepend`$$CommandHashName[`"CallTarget`"] = `$CallableEntity") | Out-Null
+                    $null = $CommandText.AppendLine("$Prepend`$CallableEntity = New-CsAutoAttendantCallableEntity -Identity '$URI' -Type ExternalPstn")
+                    $null = $CommandText.AppendLine("$Prepend`$$CommandHashName['Action'] = 'TransferCallToTarget'")
+                    $null = $CommandText.AppendLine("$Prepend`$$CommandHashName['CallTarget'] = `$CallableEntity")
 
                 }
                 else {
-                    $CommandText.AppendLine("$Prepend`$$CommandHashName[`"$ActionName`"] = `"Forward`"") | Out-Null
-                    $CommandText.AppendLine("$Prepend`$$CommandHashName[`"$ActionTargetName`"] = `"$URI`"") | Out-Null
+                    $null = $CommandText.AppendLine("$Prepend`$$CommandHashName['$ActionName'] = 'Forward'")
+                    $null = $CommandText.AppendLine("$Prepend`$$CommandHashName['$ActionTargetName'] = '$URI'")
                 }
             }
         }
-        "TransferToQueue" {
+        'TransferToQueue' {
             $Queue = $ProcessedQueues.Where( { $_.Identity -eq $QueueId })[0]
             if ($null -eq $Queue) {
-                $WarningStrings.AppendLine("$FlowName will to transfer to the queue with ID: $QueueId. This queue was not found, the $ActionName will be set to disconnect") | Out-Null
-                $CommandText.AppendLine("${Prepend}Write-Warning `"Queue not found, set to Disconnect`"") | Out-Null
+                $null = $WarningStrings.AppendLine("$FlowName will to transfer to the queue with ID: $QueueId. This queue was not found, the $ActionName will be set to disconnect")
+                $null = $CommandText.AppendLine("${Prepend}Write-Warning 'Queue not found, set to Disconnect'")
                 WriteDisconnectAction -CommandText $CommandText -CommandHashName $CommandHashName -ActionName $ActionName -AAMenuOption:$AAMenuOption -Prepend $Prepend
             }
             else {
-                $QueueName = "CQ " + (CleanName $Queue.Name)
-                $WarningStrings.AppendLine("$FlowName will to transfer to the $QueueName queue. Ensure queue exists online, otherwise, the $ActionName will be set to disconnect") | Out-Null
-                $CommandText.AppendLine("$Prepend`$Queue = try {") | Out-Null
-                $CommandText.AppendLine("$Prepend`t@(Get-CsCallQueue -NameFilter `"$QueueName`" -First 1)[0].Identity") | Out-Null
-                $CommandText.AppendLine("$Prepend} catch {") | Out-Null
-                $CommandText.AppendLine("$Prepend`t`$null") | Out-Null
-                $CommandText.AppendLine("$Prepend}") | Out-Null
+                $QueueName = 'CQ ' + (CleanName $Queue.Name)
+                $null = $WarningStrings.AppendLine("$FlowName will to transfer to the $QueueName queue. Ensure queue exists online, otherwise, the $ActionName will be set to disconnect")
+                $null = $CommandText.AppendLine("$Prepend`$Queue = try {")
+                $null = $CommandText.AppendLine("$Prepend    @(Get-CsCallQueue -NameFilter '$QueueName' -First 1)[0].Identity")
+                $null = $CommandText.AppendLine("$Prepend} catch {")
+                $null = $CommandText.AppendLine("$Prepend    `$null")
+                $null = $CommandText.AppendLine("$Prepend}")
 
-                $CommandText.AppendLine("${Prepend}if ([string]::IsNullOrEmpty(`$Queue)) {") | Out-Null
-                $CommandText.AppendLine("$Prepend`tWrite-Warning `"TransferToQueue could not find valid object for $QueueName, $ActionName set to Disconnect`"") | Out-Null
+                $null = $CommandText.AppendLine("${Prepend}if ([string]::IsNullOrEmpty(`$Queue)) {")
+                $null = $CommandText.AppendLine("$Prepend    Write-Warning 'TransferToQueue could not find valid object for $QueueName, $ActionName set to Disconnect'")
                 WriteDisconnectAction -CommandText $CommandText -CommandHashName $CommandHashName -ActionName $ActionName -AAMenuOption:$AAMenuOption -NumTabs 1 -Prepend $Prepend
-                $CommandText.AppendLine("$Prepend} else {") | Out-Null
+                $null = $CommandText.AppendLine("$Prepend} else {")
                 if ($AAMenuOption) {
-                    $CommandText.AppendLine("$Prepend`t`$CallableEntity = New-CsAutoAttendantCallableEntity -Identity `$Queue -Type HuntGroup") | Out-Null
-                    $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"Action`"] = `"TransferCallToTarget`"") | Out-Null
-                    $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"CallTarget`"] = `$CallableEntity") | Out-Null
+                    $null = $CommandText.AppendLine("$Prepend    `$CallableEntity = New-CsAutoAttendantCallableEntity -Identity `$Queue -Type HuntGroup")
+                    $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['Action'] = 'TransferCallToTarget'")
+                    $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['CallTarget'] = `$CallableEntity")
 
                 }
                 else {
-                    $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"$ActionName`"] = `"Forward`"") | Out-Null
-                    $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"$ActionTargetName`"] = `$Queue") | Out-Null
+                    $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['$ActionName'] = 'Forward'")
+                    $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['$ActionTargetName'] = `$Queue")
                 }
-                $CommandText.AppendLine("$Prepend}") | Out-Null
+                $null = $CommandText.AppendLine("$Prepend}")
             }
         }
-        "TransferToUri" {
-            $WarningStrings.AppendLine("$FlowName will to transfer to $URI. Ensure user/object exists online, otherwise, the $ActionName will be set to disconnect") | Out-Null
-            $CommandText.AppendLine("$Prepend`$Target = try {") | Out-Null
-            $CommandText.AppendLine("$Prepend`t(Get-CsOnlineUser -Identity `"$URI`").ObjectID.Guid") | Out-Null
-            $CommandText.AppendLine("$Prepend} catch {") | Out-Null
-            $CommandText.AppendLine("$Prepend`t`$null") | Out-Null
-            $CommandText.AppendLine("$Prepend}") | Out-Null
-            $CommandText.AppendLine("${Prepend}if ([string]::IsNullOrEmpty(`$Target)) {") | Out-Null
-            $CommandText.AppendLine("$Prepend`tWrite-Warning `"TransferToUri could not find valid object for $URI, $ActionName set to Disconnect`"") | Out-Null
+        'TransferToUri' {
+            $null = $WarningStrings.AppendLine("$FlowName will to transfer to $URI. Ensure user/object exists online, otherwise, the $ActionName will be set to disconnect")
+            $null = $CommandText.AppendLine("$Prepend`$Target = try {")
+            $null = $CommandText.AppendLine("$Prepend    (Get-CsOnlineUser -Identity '$URI' -ErrorAction Stop).Identity")
+            $null = $CommandText.AppendLine("$Prepend} catch {")
+            $null = $CommandText.AppendLine("$Prepend    `$null")
+            $null = $CommandText.AppendLine("$Prepend}")
+            $null = $CommandText.AppendLine("${Prepend}if ([string]::IsNullOrEmpty(`$Target)) {")
+            $null = $CommandText.AppendLine("$Prepend    Write-Warning 'TransferToUri could not find valid object for $URI, $ActionName set to Disconnect'")
             WriteDisconnectAction -CommandText $CommandText -CommandHashName $CommandHashName -ActionName $ActionName -AAMenuOption:$AAMenuOption -NumTabs 1 -Prepend $Prepend
-            $CommandText.AppendLine("$Prepend} else {") | Out-Null
+            $null = $CommandText.AppendLine("$Prepend} else {")
             if ($AAMenuOption) {
-                $CommandText.AppendLine("$Prepend`t`$CallableEntity = New-CsAutoAttendantCallableEntity -Identity `$Target -Type User") | Out-Null
-                $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"Action`"] = `"TransferCallToTarget`"") | Out-Null
-                $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"CallTarget`"] = `$CallableEntity") | Out-Null
+                $null = $CommandText.AppendLine("$Prepend    `$CallableEntity = New-CsAutoAttendantCallableEntity -Identity `$Target -Type User")
+                $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['Action'] = 'TransferCallToTarget'")
+                $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['CallTarget'] = `$CallableEntity")
 
             }
             else {
-                $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"$ActionName`"] = `"Forward`"") | Out-Null
-                $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"$ActionTargetName`"] = `"`$Target`"") | Out-Null
+                $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['$ActionName'] = 'Forward'")
+                $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['$ActionTargetName'] = `"`$Target`"")
             }
-            $CommandText.AppendLine("$Prepend}") | Out-Null
+            $null = $CommandText.AppendLine("$Prepend}")
         }
-        "TransferToVoicemailUri" {
-            $WarningStrings.AppendLine("$FlowName will to transfer to $([regex]::replace($URI,'^[Ss][Ii][Pp]:','')). Ensure Microsoft 365 Mail Enabled group exists, otherwise, the $ActionName will be set to disconnect") | Out-Null
-            $CommandText.AppendLine("$Prepend`$Target = try {") | Out-Null
-            $CommandText.AppendLine("$Prepend`t(Find-CsGroup -SearchQuery `"$([regex]::replace($URI,'^[Ss][Ii][Pp]:',''))`" -ExactMatchOnly `$true -MaxResults 1 -MailEnabledOnly `$true).Id.Guid") | Out-Null
-            $CommandText.AppendLine("$Prepend} catch {") | Out-Null
-            $CommandText.AppendLine("$Prepend`t`$null") | Out-Null
-            $CommandText.AppendLine("$Prepend}") | Out-Null
-            $CommandText.AppendLine("${Prepend}if ([string]::IsNullOrEmpty(`$Target)) {") | Out-Null
-            $CommandText.AppendLine("$Prepend`tWrite-Warning `"TransferToVoicemailUri could not find valid object for $([regex]::replace($URI,'^[Ss][Ii][Pp]:','')), $ActionName set to Disconnect`"") | Out-Null
+        'TransferToVoicemailUri' {
+            $null = $WarningStrings.AppendLine("$FlowName will to transfer to $([regex]::replace($URI,'^[Ss][Ii][Pp]:','')). Ensure Microsoft 365 Mail Enabled group exists, otherwise, the $ActionName will be set to disconnect")
+            $null = $CommandText.AppendLine("$Prepend`$Target = try {")
+            $null = $CommandText.AppendLine("$Prepend    (Find-CsGroup -SearchQuery '$([regex]::replace($URI,'^[Ss][Ii][Pp]:',''))' -ExactMatchOnly `$true -MaxResults 1 -MailEnabledOnly `$true).Id.Guid")
+            $null = $CommandText.AppendLine("$Prepend} catch {")
+            $null = $CommandText.AppendLine("$Prepend    `$null")
+            $null = $CommandText.AppendLine("$Prepend}")
+            $null = $CommandText.AppendLine("${Prepend}if ([string]::IsNullOrEmpty(`$Target)) {")
+            $null = $CommandText.AppendLine("$Prepend    Write-Warning 'TransferToVoicemailUri could not find valid object for $([regex]::replace($URI,'^[Ss][Ii][Pp]:','')), $ActionName set to Disconnect'")
             WriteDisconnectAction -CommandText $CommandText -CommandHashName $CommandHashName -ActionName $ActionName -AAMenuOption:$AAMenuOption -NumTabs 1 -Prepend $Prepend
-            $CommandText.AppendLine("$Prepend} else {") | Out-Null
+            $null = $CommandText.AppendLine("$Prepend} else {")
             if ($AAMenuOption) {
-                $CommandText.AppendLine("$Prepend`t`$CallableEntity = New-CsAutoAttendantCallableEntity -Identity `$Target -Type SharedVoicemail -EnableTranscription") | Out-Null
-                $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"Action`"] = `"TransferCallToTarget`"") | Out-Null
-                $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"CallTarget`"] = `$CallableEntity") | Out-Null
+                $null = $CommandText.AppendLine("$Prepend    `$CallableEntity = New-CsAutoAttendantCallableEntity -Identity `$Target -Type SharedVoicemail -EnableTranscription")
+                $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['Action'] = 'TransferCallToTarget'")
+                $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['CallTarget'] = `$CallableEntity")
 
             }
             else {
                 if (![string]::IsNullOrEmpty($TextPrompt)) {
-                    $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"$TextPromptParamName`"] = `"$TextPrompt`"") | Out-Null
+                    $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['$TextPromptParamName'] = '$TextPrompt'")
                 }
                 elseif (![string]::IsNullOrEmpty($AudioFilePromptLocation)) {
                     AddFileImportScript -ApplicationId HuntGroup -StoredLocation $AudioFilePromptLocation -FileName $AudioFilePromptOriginalName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend $Prepend
-                    $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"$AudioPromptParamName`"] = `"`$(`$FileId.Id)`"") | Out-Null
+                    $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['$AudioPromptParamName'] = `"`$(`$FileId.Id)`"")
                 }
                 else {
-                    $WarningStrings.AppendLine("$FlowName will to transfer to $([regex]::replace($URI,'^[Ss][Ii][Pp]:','')) on $ActionName. No Prompt information was found, so a sample Text-To-Speech prompt was generated.") | Out-Null
-                    $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"$TextPromptParamName`"] = `"Please leave a message.`"") | Out-Null
+                    $null = $WarningStrings.AppendLine("$FlowName will to transfer to $([regex]::replace($URI,'^[Ss][Ii][Pp]:','')) on $ActionName. No Prompt information was found, so a sample Text-To-Speech prompt was generated.")
+                    $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['$TextPromptParamName'] = 'Please leave a message.'")
                 }
-                $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"$ActionName`"] = `"Voicemail`"") | Out-Null
-                $CommandText.AppendLine("$Prepend`t`$$CommandHashName[`"$ActionTargetName`"] = `"`$Target`"") | Out-Null
+                $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['$ActionName'] = 'Voicemail'")
+                $null = $CommandText.AppendLine("$Prepend    `$$CommandHashName['$ActionTargetName'] = `"`$Target`"")
             }
-            $CommandText.AppendLine("$Prepend}") | Out-Null
+            $null = $CommandText.AppendLine("$Prepend}")
         }
         default {
             if ([string]::IsNullOrEmpty($Action)) {
-                $WarningStrings.AppendLine("$FlowName had no action assigned. The $ActionName will be set to disconnect") | Out-Null
+                $null = $WarningStrings.AppendLine("$FlowName had no action assigned. The $ActionName will be set to disconnect")
             }
             else {
-                $WarningStrings.AppendLine("$FlowName attempted to $Action. This is not supported in this script, the $ActionName will be set to disconnect") | Out-Null
+                $null = $WarningStrings.AppendLine("$FlowName attempted to $Action. This is not supported in this script, the $ActionName will be set to disconnect")
             }
             WriteDisconnectAction -CommandText $CommandText -CommandHashName $CommandHashName -ActionName $ActionName -AAMenuOption:$AAMenuOption -NumTabs 1 -Prepend $Prepend
         }
@@ -291,9 +270,9 @@ function ConvertNonQuestionAction {
 
 function AddFileImportScript {
     param (
-        [ValidateSet("HuntGroup", "OrgAutoAttendant")]
-        [string] 
-        $ApplicationId = "HuntGroup",
+        [ValidateSet('HuntGroup', 'OrgAutoAttendant')]
+        [string]
+        $ApplicationId = 'HuntGroup',
         $StoredLocation,
         $FileName,
         [Text.StringBuilder]
@@ -301,21 +280,21 @@ function AddFileImportScript {
         [Text.StringBuilder]
         $WarningStrings,
         [string]
-        $Prepend = ""
+        $Prepend = ''
     )
     $FilePath = Get-ChildItem -Path $StoredLocation
-    $AudioFilePath = [IO.Path]::Combine($GeneratedScriptsPath, "AudioFiles")
+    $AudioFilePath = [IO.Path]::Combine($GeneratedScriptsPath, 'AudioFiles')
     $SavedFile = [IO.Path]::Combine($AudioFilePath, $FilePath.Name)
     if (!(Test-Path -Path $SavedFile)) {
         if (!(Test-Path -Path $AudioFilePath)) {
-            New-Item -Path $AudioFilePath -ItemType Directory | Out-Null
+            $null = New-Item -Path $AudioFilePath -ItemType Directory
         }
         Copy-Item -Path $FilePath.FullName -Destination $AudioFilePath
     }
-    $WarningStrings.AppendLine("Ensure this file exists in this relative path prior to execution: .\AudioFiles\$([IO.Path]::GetFileName($SavedFile))") | Out-Null
-    $CommandText.AppendLine("$Prepend`$FilePath = [IO.Path]::Combine(`$PSScriptRoot, `"AudioFiles`", `"$([IO.Path]::GetFileName($SavedFile))`")") | Out-Null
-    $CommandText.AppendLine("$Prepend`$FileBytes = [IO.File]::ReadAllBytes(`$FilePath)") | Out-Null
-    $CommandText.AppendLine("$Prepend`$FileId = Import-CsOnlineAudioFile -ApplicationId $ApplicationId -FileName `"$FileName`" -Content `$FileBytes") | Out-Null
+    $null = $WarningStrings.AppendLine("Ensure this file exists in this relative path prior to execution: .\AudioFiles\$([IO.Path]::GetFileName($SavedFile))")
+    $null = $CommandText.AppendLine("$Prepend`$FilePath = [IO.Path]::Combine(`$PSScriptRoot, 'AudioFiles', '$([IO.Path]::GetFileName($SavedFile))')")
+    $null = $CommandText.AppendLine("$Prepend`$FileBytes = [IO.File]::ReadAllBytes(`$FilePath)")
+    $null = $CommandText.AppendLine("$Prepend`$FileId = Import-CsOnlineAudioFile -ApplicationId $ApplicationId -FileName '$FileName' -Content `$FileBytes")
 }
 
 function RoundTimeSpan ([TimeSpan] $ts) {
@@ -341,17 +320,17 @@ function ConvertFrom-BusinessHoursToTimeRange {
         $Hours1,
         $Hours2
     )
-    $ConfigString = "@("
+    $ConfigString = '@('
     if ($null -ne $Hours1) {
-        $ConfigString += "(New-CsOnlineTimeRange -Start `"$(RoundTimeSpan $Hours1.OpenTime)`" -End `"$(RoundTimeSpan $Hours1.CloseTime)`")"
+        $ConfigString += "(New-CsOnlineTimeRange -Start '$(RoundTimeSpan $Hours1.OpenTime)' -End '$(RoundTimeSpan $Hours1.CloseTime)')"
     }
     if ($null -ne $Hours2) {
         if ($ConfigString.Length -gt 2) {
             $ConfigString += ",$([Environment]::NewLine)"
         }
-        $ConfigString += "(New-CsOnlineTimeRange -Start `"$(RoundTimeSpan $Hours2.OpenTime)`" -End `"$(RoundTimeSpan $Hours2.CloseTime)`")"
+        $ConfigString += "(New-CsOnlineTimeRange -Start '$(RoundTimeSpan $Hours2.OpenTime)' -End '$(RoundTimeSpan $Hours2.CloseTime)')"
     }
-    $ConfigString += ")"
+    $ConfigString += ')'
     $ConfigString
 }
 
@@ -370,7 +349,7 @@ function CleanName ($Name, $LineURI) {
 
     # Remove spaces at beginning and end and Add LineURI to the end to be used for the DisplayName
     if (![string]::IsNullOrWhiteSpace($LineURI)) {
-        $Name.Trim() + " (" + $LineURI + ")"
+        $Name.Trim() + ' (' + $LineURI + ')'
     }
     else {
         $Name.Trim()
@@ -388,23 +367,23 @@ function HashTableToDeclareString ([hashtable]$Hashtable, $VariableName = 'HashT
         else {
             switch -regex ($kv.Value.GetType().ToString().ToLower()) {
                 "^system\.object\[\]$" {
-                    $Nested = @("@(")
+                    $Nested = @('@(')
                     $Nested += foreach ($v in $kv.Value) {
                         switch -regex ($v.GetType().ToString().ToLower()) {
                             "int\d*$" {
                                 $v
                                 break
                             }
-                            "bool" {
+                            'bool' {
                                 "`$$($v.ToString().ToLower())"
                             }
                             default {
-                                "`"$($v)`""
+                                "'$($v)'"
                                 break
                             }
                         }
                     }
-                    $Nested += ")"
+                    $Nested += ')'
                     [string]::Join([Environment]::NewLine, $Nested)
                     break
                 }
@@ -412,16 +391,23 @@ function HashTableToDeclareString ([hashtable]$Hashtable, $VariableName = 'HashT
                     $kv.Value
                     break
                 }
-                "bool" {
+                'bool' {
                     "`$$($kv.Value.ToString().ToLower())"
                 }
                 default {
-                    "`"$($kv.Value)`""
+                    # "'$($kv.Value)'"
+                    $v = $kv.Value.ToString()
+                    if ($v.IndexOfAny(@(' ', '"', "'")) -gt -1 -or !$v.StartsWith('$')) {
+                        "'$($v -replace "'","''")'"
+                    }
+                    else {
+                        $v
+                    }
                     break
                 }
             }
         }
-        $sb.AppendLine("$Prepend`$$VariableName[`"$($kv.Key)`"] = $Value") | Out-Null
+        $null = $sb.AppendLine("$Prepend`$$VariableName['$($kv.Key)'] = $Value")
     }
     $sb.ToString()
 }
@@ -430,16 +416,16 @@ function GetSoundPath($AudioFilePrompt, $InstanceId) {
         $SoundUnique = $AudioFilePrompt.UniqueName
         $SoundFile = $AudioFilePrompt.OriginalFileName
         $actualFileName = $SoundUnique + [IO.Path]::GetExtension($SoundFile)
-        $SoundPath = $RGSExportPath + "\*\RgsImportExport\RGS\Instances\" + $instanceID + "\"
+        $SoundPath = $RGSExportPath + '\*\RgsImportExport\RGS\Instances\' + $instanceID + '\'
         $SoundPath = (Resolve-Path $SoundPath).Path
 
         $FilePath = Get-ChildItem -Path $SoundPath -Recurse -Filter $actualFileName
         $SoundPath = if ($null -eq $FilePath) {
-            $actualFileName = $SoundUnique + ".wav"
+            $actualFileName = $SoundUnique + '.wav'
             $FilePath = Get-ChildItem -Path $SoundPath -Recurse -Filter $actualFileName
             if ($null -eq $FilePath) {
                 Write-Warning "Instance ID: $instanceID, Sound File: $SoundFile, or Sound Unique: $SoundUnique not found! Unable to locate file"
-                ""
+                ''
             }
             else {
                 $FilePath.FullName
@@ -451,7 +437,7 @@ function GetSoundPath($AudioFilePrompt, $InstanceId) {
         $SoundPath
     }
     else {
-        ""
+        ''
     }
 }
 function ProcessAnswer {
@@ -460,11 +446,11 @@ function ProcessAnswer {
         $Prefix
     )
     switch ($Tier2_DefaultAnswer.DtmfResponse) {
-        "#" {
-            $Option = ($Prefix + "Pound")
+        '#' {
+            $Option = ($Prefix + 'Pound')
         }
-        "*" {
-            $Option = ($Prefix + "Star")
+        '*' {
+            $Option = ($Prefix + 'Star')
         }
         default {
             $Option = ($Prefix + $Answer.DtmfResponse)
@@ -472,23 +458,23 @@ function ProcessAnswer {
     }
 
     switch ($Answer.Action.Action) {
-        "Terminate" {
+        'Terminate' {
             $InsertHash["$Option"] = $null
         }
-        "TransferToQueue" {
+        'TransferToQueue' {
             $TransferToQueue = $Answer.Action.QueueID.InstanceID.Guid
             $InsertHash["$Option"] = $(if ([string]::IsNullOrEmpty($Answer.Action.QueueID)) { $null } else { $TransferToQueue })
         }
-        "TransferToQuestion" {
-            $InsertHash["$Option"] = $(if ([string]::IsNullOrEmpty($Answer.Action.Question)) { $null } else { "TransferToQuestion" })
+        'TransferToQuestion' {
+            $InsertHash["$Option"] = $(if ([string]::IsNullOrEmpty($Answer.Action.Question)) { $null } else { 'TransferToQuestion' })
         }
-        "TransferToUri" {
+        'TransferToUri' {
             $InsertHash["$Option"] = $(if ([string]::IsNullOrEmpty($Answer.Action.URI)) { $null } else { $Answer.Action.URI })
         }
-        "TransferToVoicemailUri" {
+        'TransferToVoicemailUri' {
             $InsertHash["$Option"] = $(if ([string]::IsNullOrEmpty($Answer.Action.URI)) { $null } else { $Answer.Action.URI })
         }
-        "TransferToPstn" {
+        'TransferToPstn' {
             $InsertHash["$Option"] = $(if ([string]::IsNullOrEmpty($Answer.Action.URI)) { $null } else { $Answer.Action.URI })
         }
         default {
@@ -527,11 +513,11 @@ $ProcessedWorkflows = @(foreach ($ThisFlow in $WorkFlows) {
         $InsertHash['DefaultActionAction'] = $(if ([string]::IsNullOrEmpty(($ThisFlow).DefaultAction.Action)) { $null } else { ($ThisFlow).DefaultAction.Action })
         $InsertHash['DefaultActionQueueID'] = $(if ([string]::IsNullOrEmpty(($ThisFlow).DefaultAction.QueueID)) { $null } else { ($ThisFlow).DefaultAction.QueueID.InstanceID.Guid })
         $InsertHash['DefaultActionURI'] = $(if ([string]::IsNullOrEmpty(($ThisFlow).DefaultAction.URI)) { $null } else { ($ThisFlow).DefaultAction.URI })
-        
+
         $SoundPath = GetSoundPath ($ThisFlow).CustomMusicOnHoldFile $ThisFlow.Identity.InstanceID.Guid
         $InsertHash['CustomMusicOnHoldStoredLocation'] = $(if ([string]::IsNullOrEmpty($SoundPath)) { $null } else { $SoundPath })
         $InsertHash['CustomMusicOnHoldFileName'] = $(if ([string]::IsNullOrEmpty($ThisFlow.CustomMusicOnHoldFile.OriginalFileName)) { $null } else { $ThisFlow.CustomMusicOnHoldFile.OriginalFileName })
-        
+
         $InsertHash['Name'] = $(if ([string]::IsNullOrEmpty($ThisFlow.Name)) { $null } else { $ThisFlow.Name })
         $InsertHash['Description'] = $(if ([string]::IsNullOrEmpty($ThisFlow.Description)) { $null } else { $ThisFlow.Description })
         $InsertHash['PrimaryUri'] = $(if ([string]::IsNullOrEmpty($ThisFlow.PrimaryUri)) { $null } else { $ThisFlow.PrimaryUri })
@@ -559,10 +545,10 @@ $ProcessedQueues = @(foreach ($ThisQueue in $Queues) {
             $ThisQueue.AgentGroupIDList[0].InstanceID.Guid
         }
         else {
-            ""
+            ''
         }
         if ($ThisQueue.AgentGroupIDList.Count -gt 1) {
-            $WarningStrings.AppendLine("$($ThisQueue.Name) has multiple agent groups, only the first group will be included") | Out-Null
+            $null = $WarningStrings.AppendLine("$($ThisQueue.Name) has multiple agent groups, only the first group will be included")
         }
 
         $TimeOut = ($ThisQueue).TimeoutAction
@@ -576,18 +562,18 @@ $ProcessedQueues = @(foreach ($ThisQueue in $Queues) {
         $InsertHash['OverflowCandidate'] = $(if ([string]::IsNullOrEmpty($ThisQueue.OverflowCandidate)) { $null } else { $ThisQueue.OverflowCandidate })
         $InsertHash['OwnerPool'] = $(if ([string]::IsNullOrEmpty($ThisQueue.OwnerPool)) { $null } else { $ThisQueue.OwnerPool })
         $InsertHash['AgentGroupIDList'] = $(if ([string]::IsNullOrEmpty($ThisQueueIDList)) { $null } else { $ThisQueueIDList })
-    
+
         $SoundPath = GetSoundPath $TimeOut.Prompt.AudioFilePrompt $ThisQueue.Identity.InstanceID.Guid
         if (![string]::IsNullOrEmpty($SoundPath)) { Write-Host "CQ $($ThisFlow.Name) TimeoutPrompt $SoundPath" }
         $InsertHash['TimeoutAudioStoredLocation'] = $(if ([string]::IsNullOrEmpty($SoundPath)) { $null } else { $SoundPath })
         $InsertHash['TimeoutAudioOriginalName'] = $(if ([string]::IsNullOrEmpty($TimeOut.Prompt.AudioFilePrompt.OriginalName)) { $null } else { $TimeOut.prompt.AudioFilePrompt.OriginalName })
 
-        $InsertHash['TimeoutTextPrompt'] = $(if ([string]::IsNullOrEmpty($TimeOut.Prompt.TextFilePrompt)) { $null } else { $TimeOut.Prompt.TextFilePrompt })   
+        $InsertHash['TimeoutTextPrompt'] = $(if ([string]::IsNullOrEmpty($TimeOut.Prompt.TextFilePrompt)) { $null } else { $TimeOut.Prompt.TextFilePrompt })
         $InsertHash['TimeoutQuestion'] = $(if ([string]::IsNullOrEmpty($TimeOut.Question)) { $null } else { $TimeOut.Question })
         $InsertHash['TimeoutAction'] = $(if ([string]::IsNullOrEmpty($TimeOut.Action)) { $null } else { $TimeOut.Action })
         $InsertHash['TimeoutQueueID'] = $(if ([string]::IsNullOrEmpty($TimeOut.QueueID)) { $null } else { $TimeOut.QueueID.InstanceID.Guid })
-        $InsertHash['TimeoutUri'] = $(if ([string]::IsNullOrEmpty($TimeOut.Uri)) { $null } else { $TimeOut.Uri })    
-    
+        $InsertHash['TimeoutUri'] = $(if ([string]::IsNullOrEmpty($TimeOut.Uri)) { $null } else { $TimeOut.Uri })
+
 
         $SoundPath = GetSoundPath $Overflow.Prompt.AudioFilePrompt $ThisQueue.Identity.InstanceID.Guid
         if (![string]::IsNullOrEmpty($SoundPath)) { Write-Host "CQ $($ThisFlow.Name) OverflowPrompt $SoundPath" }
@@ -628,7 +614,7 @@ $ProcessedIVRs = @(foreach ($RGS in $IVRs) {
         $InsertHash['DefaultNoAnswer'] = $(if ([string]::IsNullOrEmpty($ThisFlowDefaultNoAnswer)) { $null } else { $ThisFlowDefaultNoAnswer })
         $ThisFlowDefaultName = $ThisFlow.DefaultAction.Question.Name
         $InsertHash['DefaultName'] = $(if ([string]::IsNullOrEmpty($ThisFlowDefaultName)) { $null } else { $ThisFlowDefaultName })
-    
+
         ##### Nulling out the options for write back
         $InsertHash['DefaultOpt0'] = $null
         $InsertHash['DefaultOpt1'] = $null
@@ -646,8 +632,8 @@ $ProcessedIVRs = @(foreach ($RGS in $IVRs) {
         ##### Go through the answer list in case it exists and overwriting the above nulled default values
         if (![string]::IsNullOrEmpty($ThisFlow.DefaultAction.Question.AnswerList)) {
             foreach ($DefaultAnswer in $ThisFlow.DefaultAction.Question.AnswerList) {
-                ProcessAnswer $DefaultAnswer "DefaultOpt"
-            } 
+                ProcessAnswer $DefaultAnswer 'DefaultOpt'
+            }
         }
 
         ##### NonBus write-backs
@@ -682,7 +668,7 @@ $ProcessedIVRs = @(foreach ($RGS in $IVRs) {
         ##### Go through the answer list in case it exists and overwriting the above nulled default values
         if (![string]::IsNullOrEmpty($ThisFlow.NonBusinessHoursAction.Question.AnswerList)) {
             foreach ($NonBusAnswer in $ThisFlow.NonBusinessHoursAction.Question.AnswerList) {
-                ProcessAnswer $NonBusAnswer "NonBusOpt"
+                ProcessAnswer $NonBusAnswer 'NonBusOpt'
             }
         }
 
@@ -718,7 +704,7 @@ $ProcessedIVRs = @(foreach ($RGS in $IVRs) {
         ##### Go through the answer list in case it exists and overwriting the above nulled default values
         if (![string]::IsNullOrEmpty($ThisFlow.HolidayAction.Question.AnswerList)) {
             foreach ($HolidayAnswer in $ThisFlow.HolidayAction.Question.AnswerList) {
-                ProcessAnswer $HolidayAnswer "HolidayOpt"
+                ProcessAnswer $HolidayAnswer 'HolidayOpt'
             }
         }
 
@@ -733,33 +719,33 @@ $Tier2ProcessedIVRs = @(foreach ($RGS in $Tier2IVRs) {
 
         $InsertHash['Identity'] = $(if ([string]::IsNullOrEmpty($RGS)) { $null } else { $RGS })
         $InsertHash['Name'] = $(if ([string]::IsNullOrEmpty($ThisFlow.Name)) { $null } else { $ThisFlow.Name })
-        $PrimaryAnswerLists = $ThisFlow.DefaultAction.Question.AnswerList.Where( { $_.Action.Action -eq "TransferToQuestion" })
+        $PrimaryAnswerLists = $ThisFlow.DefaultAction.Question.AnswerList.Where( { $_.Action.Action -eq 'TransferToQuestion' })
 
         if (![string]::IsNullOrEmpty($PrimaryAnswerLists)) {
             foreach ($AnswerList in $PrimaryAnswerLists) {
                 ##### Nulling out the options for write back
-                $InsertHash["Tier2_DefaultOpt0"] = $null
-                $InsertHash["Tier2_DefaultOpt1"] = $null
-                $InsertHash["Tier2_DefaultOpt2"] = $null
-                $InsertHash["Tier2_DefaultOpt3"] = $null
-                $InsertHash["Tier2_DefaultOpt4"] = $null
-                $InsertHash["Tier2_DefaultOpt5"] = $null
-                $InsertHash["Tier2_DefaultOpt6"] = $null
-                $InsertHash["Tier2_DefaultOpt7"] = $null
-                $InsertHash["Tier2_DefaultOpt8"] = $null
-                $InsertHash["Tier2_DefaultOpt9"] = $null
-                $InsertHash["Tier2_DefaultOptPound"] = $null
-                $InsertHash["Tier2_DefaultOptStar"] = $null
+                $InsertHash['Tier2_DefaultOpt0'] = $null
+                $InsertHash['Tier2_DefaultOpt1'] = $null
+                $InsertHash['Tier2_DefaultOpt2'] = $null
+                $InsertHash['Tier2_DefaultOpt3'] = $null
+                $InsertHash['Tier2_DefaultOpt4'] = $null
+                $InsertHash['Tier2_DefaultOpt5'] = $null
+                $InsertHash['Tier2_DefaultOpt6'] = $null
+                $InsertHash['Tier2_DefaultOpt7'] = $null
+                $InsertHash['Tier2_DefaultOpt8'] = $null
+                $InsertHash['Tier2_DefaultOpt9'] = $null
+                $InsertHash['Tier2_DefaultOptPound'] = $null
+                $InsertHash['Tier2_DefaultOptStar'] = $null
 
                 ##### write back which Primary DTMFResponse we need to dig into further
-                $PrimaryDTMFResponse = "DefaultAction_" + $AnswerList.DtmfResponse
-                $InsertHash["OriginatorOption"] = $(if ([string]::IsNullOrEmpty($PrimaryDTMFResponse)) { $null } else { $PrimaryDTMFResponse })
-            
+                $PrimaryDTMFResponse = 'DefaultAction_' + $AnswerList.DtmfResponse
+                $InsertHash['OriginatorOption'] = $(if ([string]::IsNullOrEmpty($PrimaryDTMFResponse)) { $null } else { $PrimaryDTMFResponse })
+
                 ##### getting second tier info for write back
                 $SecondAnswerList = $AnswerList.Action.Question.AnswerList
-            
+
                 foreach ($Tier2_DefaultAnswer in $SecondAnswerList) {
-                    ProcessAnswer $Tier2_DefaultAnswer "Tier2_DefaultOpt"
+                    ProcessAnswer $Tier2_DefaultAnswer 'Tier2_DefaultOpt'
                 }
             }
         }
@@ -779,10 +765,10 @@ $ProcessedAgentGroups = @(foreach ($AgentGroup in $AgentGroups) {
         $InsertHash['OwnerPool'] = $AgentGroup.OwnerPool
         $InsertHash['AgentsByUri'] = $AgentGroup.AgentsByUri.AbsolutePath
         if ($null -ne $AgentGroup.DistributionGroupAddress) {
-            $WarningStrings.AppendLine("$($AgentGroup.Name) uses DistributionGroup $($AgentGroup.DistributionGroupAddress -join ',')") | Out-Null
-            $WarningStrings.AppendLine("Ensure the following commands return valid values:") | Out-Null
+            $null = $WarningStrings.AppendLine("$($AgentGroup.Name) uses DistributionGroup $($AgentGroup.DistributionGroupAddress -join ',')")
+            $null = $WarningStrings.AppendLine('Ensure the following commands return valid values:')
             foreach ($dg in $AgentGroup.DistributionGroupAddress) {
-                $WarningStrings.AppendLine("`tFind-CsGroup -SearchQuery `"$dg`" -ExactMatchOnly `$true") | Out-Null
+                $null = $WarningStrings.AppendLine("    Find-CsGroup -SearchQuery '$dg' -ExactMatchOnly `$true")
             }
         }
         $InsertHash['Warnings'] = $WarningStrings.ToString()
@@ -795,19 +781,19 @@ foreach ($Workflow in $CallQueues) {
     $DefaultQueue = $ProcessedQueues.Where( { $_.Identity -eq $Workflow.DefaultActionQueueID }, 'First')[0]
     $WarningStrings = [Text.StringBuilder]::new()
     if (![string]::IsNullOrEmpty($Workflow.Warnings)) {
-        $WarningStrings.AppendLine($Workflow.Warnings) | Out-Null
+        $null = $WarningStrings.AppendLine($Workflow.Warnings)
     }
     if ([string]::IsNullOrWhiteSpace($DefaultQueue.Name)) {
-        $WarningStrings.AppendLine("Default Queue: $($Workflow.DefaultActionQueueID) for $($Workflow.Name) has no valid name assigned") | Out-Null
+        $null = $WarningStrings.AppendLine("Default Queue: $($Workflow.DefaultActionQueueID) for $($Workflow.Name) has no valid name assigned")
     }
     if (![string]::IsNullOrEmpty($DefaultQueue.Warnings)) {
-        $WarningStrings.AppendLine($DefaultQueue.Warnings) | Out-Null
+        $null = $WarningStrings.AppendLine($DefaultQueue.Warnings)
     }
 
     # Define the name based on the available data in the row if on-prem Queue Name fails use the workflow name
     $AAName = if ([string]::IsNullOrEmpty($Workflow.Name)) {
         if ([string]::IsNullOrEmpty($DefaultQueue.Name)) {
-            Write-Warning "Workflow has no valid name"
+            Write-Warning 'Workflow has no valid name'
             continue
         }
         else {
@@ -819,7 +805,7 @@ foreach ($Workflow in $CallQueues) {
     }
     $CQName = if ([string]::IsNullOrEmpty($DefaultQueue.Name)) {
         if ([string]::IsNullOrEmpty($Workflow.Name)) {
-            Write-Warning "Workflow has no valid name"
+            Write-Warning 'Workflow has no valid name'
             continue
         }
         else {
@@ -834,165 +820,143 @@ foreach ($Workflow in $CallQueues) {
     $LineURI = [regex]::Replace($LineURI, '[^0-9x]', '')
 
     $NameLURI = CleanName $CQName $LineURI
-    $CQNameLURI = "CQ " + $NameLURI
+    $CQNameLURI = 'CQ ' + $NameLURI
     $NameLURI = CleanName $AAName $LineURI
-    $AANameLURI = "AA " + $NameLURI
+    $AANameLURI = 'AA ' + $NameLURI
     $AADispName = $NameLURI
     $CQDispName = $CQNameLURI
 
-    $FileName = [IO.Path]::Combine($GeneratedScriptsPath, ($AADispName + ".ps1"))
+    $FileName = [IO.Path]::Combine($GeneratedScriptsPath, ($AADispName + '.ps1'))
 
     $CallQueueParams = @{}
     # Add name to param list
-    $CallQueueParams["Name"] = "`$CQName"
+    $CallQueueParams['Name'] = '$CQName'
+    $CallQueueParams['ErrorAction'] = 'Stop'
 
     # TODO: Need to add module logic to a given script
 
-    $CommandText.AppendLine("# Original HuntGroup Name: $($Workflow.Name)") | Out-Null
-    $CommandText.AppendLine("#     Original Queue Name: $($DefaultQueue.Name)") | Out-Null
-    $CommandText.AppendLine("#             New AA Name: $AADispName") | Out-Null
-    $CommandText.AppendLine("#             New CQ Name: $CQDispName") | Out-Null
-    $CommandText.AppendLine("#                 LineUri: $LineURI") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine("# Original HuntGroup Name: $($Workflow.Name)")
+    $null = $CommandText.AppendLine("#     Original Queue Name: $($DefaultQueue.Name)")
+    $null = $CommandText.AppendLine("#             New AA Name: $AADispName")
+    $null = $CommandText.AppendLine("#             New CQ Name: $CQDispName")
+    $null = $CommandText.AppendLine("#                 LineUri: $LineURI")
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("param (") | Out-Null
-    $CommandText.AppendLine("`t[switch]`$GenerateAccountsOnly,") | Out-Null
-    $CommandText.AppendLine("`t[switch]`$AssignLineUri") | Out-Null
-    $CommandText.AppendLine(")") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine('[CmdletBinding()]')
+    $null = $CommandText.AppendLine('param (')
+    $null = $CommandText.AppendLine('    [switch]')
+    $null = $CommandText.AppendLine('    $GenerateAccountsOnly,')
+    $null = $CommandText.AppendLine()
+    $null = $CommandText.AppendLine('    [switch]')
+    $null = $CommandText.AppendLine('    $AssignLineUri')
+    $null = $CommandText.AppendLine(')')
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("`$CsvPath = [IO.Path]::Combine(`$PSScriptRoot,`"`$([IO.Path]::GetFileNameWithoutExtension(`$MyInvocation.MyCommand.Name)).csv`")") | Out-Null
-    $CommandText.AppendLine("if (!(Test-Path -Path `$CsvPath)) { Write-Warning `"Cannot locate config csv at path `$CsvPath. Exiting...`"; exit }") | Out-Null
-    $CommandText.AppendLine("`$Config = Import-Csv -Path `$CsvPath") | Out-Null
-    $CommandText.AppendLine("`$AAName = `$Config.AADispName") | Out-Null
-    $CommandText.AppendLine("`$CQName = `$Config.CQDispName") | Out-Null
-    $CommandText.AppendLine("`$CQAccountName = `$Config.CQName") | Out-Null
-    $CommandText.AppendLine("`$AAAccountName = `$Config.AAName") | Out-Null
-    $CommandText.AppendLine("`$DeploymentStatus = `$Config.DeploymentStatus") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine('$CsvPath = [IO.Path]::Combine($PSScriptRoot,"$([IO.Path]::GetFileNameWithoutExtension($MyInvocation.MyCommand.Name)).csv")')
+    $null = $CommandText.AppendLine('if (!(Test-Path -Path $CsvPath)) { Write-Warning "Cannot locate config csv at path $CsvPath. Exiting..."; exit }')
+    $null = $CommandText.AppendLine('$Config = Import-Csv -Path $CsvPath')
+    $null = $CommandText.AppendLine('$AAName = $Config.AADispName')
+    $null = $CommandText.AppendLine('$CQName = $Config.CQDispName')
+    $null = $CommandText.AppendLine('$CQAccountName = $Config.CQName')
+    $null = $CommandText.AppendLine('$AAAccountName = $Config.AAName')
+    $null = $CommandText.AppendLine('$DeploymentStatus = $Config.DeploymentStatus')
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("function CreateApplicationInstance {") | Out-Null
-    $CommandText.AppendLine("`tparam(") | Out-Null
-    $CommandText.AppendLine("`t`t[string]`$AccountName,") | Out-Null
-    $CommandText.AppendLine("`t`t[string]`$Name,") | Out-Null
-    $CommandText.AppendLine("`t`t[string]`$SipDomain,") | Out-Null
-    $CommandText.AppendLine("`t`t[switch]`$CQ,") | Out-Null
-    $CommandText.AppendLine("`t`t[switch]`$AA,") | Out-Null
-    $CommandText.AppendLine("`t`t[switch]`$Hybrid,") | Out-Null
-    $CommandText.AppendLine("`t`t[string]`$OU") | Out-Null
-    $CommandText.AppendLine("`t)") | Out-Null
-    $CommandText.AppendLine("`t`$Prefix = if (`$CQ) { `"CQ-`" } elseif (`$AA) { `"AA-`" }") | Out-Null
-    $CommandText.AppendLine("`t`$ApplicationId = if (`$CQ) { `"11cd3e2e-fccb-42ad-ad00-878b93575e07`" } elseif (`$AA) { `"ce933385-9390-45d1-9512-c8d228074e07`" }") | Out-Null
-    $CommandText.AppendLine("`t# Getting a valid UPN for the Application Instance") | Out-Null
-    $CommandText.AppendLine("`t`$UPN = `$Prefix + (`$AccountName.Trim() -replace '[^a-zA-Z0-9_\-]', '').ToLower()") | Out-Null
-    $CommandText.AppendLine("`t`$UPN = `$UPN.Substring(0, [System.Math]::Min(20, `$UPN.Length)) + `"@`$SipDomain`"") | Out-Null
-    $CommandText.AppendLine("`tdo {") | Out-Null
-    $CommandText.AppendLine("`t`t`$UPNExist = try {") | Out-Null
-    $CommandText.AppendLine("`t`t`tif (`$Hybrid) {") | Out-Null
-    $CommandText.AppendLine("`t`t`t`tGet-CsHybridApplicationEndpoint -Filter { UserPrincipalName -eq `"`$UPN`" }") | Out-Null
-    $CommandText.AppendLine("`t`t`t} else {") | Out-Null
-    $CommandText.AppendLine("`t`t`t`tGet-CsOnlineApplicationInstance -Identity `$UPN") | Out-Null
-    $CommandText.AppendLine("`t`t`t}") | Out-Null
-    $CommandText.AppendLine("`t`t} catch {") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$null") | Out-Null
-    $CommandText.AppendLine("`t`t}") | Out-Null
-    $CommandText.AppendLine("`t`tif ([string]::IsNullOrEmpty(`$UPNExist)) {") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$valid = `$true") | Out-Null
-    $CommandText.AppendLine("`t`t} else {") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$valid = `$false") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$Random = -join ((97..122) | Get-Random -Count 4 | ForEach-Object { [char]`$_ })") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$UPN = `$Prefix + (`$AccountName.Trim() -replace '[^a-zA-Z0-9_\-]', '').ToLower()") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$UPN = `$UPN.Substring(0, [System.Math]::Min(16, `$UPN.Length)) + `$Random + `"@`$SipDomain`"") | Out-Null
-    $CommandText.AppendLine("`t`t}") | Out-Null
-    $CommandText.AppendLine("`t} until (`$valid)") | Out-Null
-    $CommandText.AppendLine("`t# Creating the Application Instance") | Out-Null
-    $CommandText.AppendLine("`ttry {") | Out-Null
-    $CommandText.AppendLine("`t`tif (`$Hybrid) {") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$NewInstance = New-CsHybridApplicationEndpoint -DisplayName `$Name -SipAddress `"sip:`$UPN`" -OU `$OU -ApplicationId `$ApplicationId") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$InstanceId = (New-Object -TypeName System.Guid -ArgumentList `$NewInstance.Name).Guid") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$InstanceUpn = `$NewInstance.UserPrincipalName -replace `"^`$Prefix`",''") | Out-Null
-    $CommandText.AppendLine("`t`t} else {") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$NewInstance = New-CsOnlineApplicationInstance -UserPrincipalName `$UPN -ApplicationId `$ApplicationId -DisplayName `$Name") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$InstanceId = `$NewInstance.ObjectID") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$InstanceUpn = `$NewInstance.UserPrincipalName -replace `"^`$Prefix`",''") | Out-Null
-    $CommandText.AppendLine("`t`t}") | Out-Null
-    $CommandText.AppendLine("`t} catch {") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `"Unable to create application instance/hybrid endpoint for `$Name ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
-    $CommandText.AppendLine("`t`texit") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine("`t[PSCustomObject]@{") | Out-Null
-    $CommandText.AppendLine("`t`tInstanceId = `$InstanceId") | Out-Null
-    $CommandText.AppendLine("`t`tInstanceUpn = `$InstanceUpn") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine("}") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine('function CreateApplicationInstance {')
+    $null = $CommandText.AppendLine('    param(')
+    $null = $CommandText.AppendLine('        [string]$AccountName,')
+    $null = $CommandText.AppendLine('        [string]$Name,')
+    $null = $CommandText.AppendLine('        [switch]$CQ,')
+    $null = $CommandText.AppendLine('        [switch]$AA,')
+    $null = $CommandText.AppendLine('        [string]$OU')
+    $null = $CommandText.AppendLine('    )')
+    $null = $CommandText.AppendLine('    $Prefix = if ($CQ) { ''CQ-'' } elseif ($AA) { ''AA-'' }')
+    $null = $CommandText.AppendLine('    $ApplicationId = if ($CQ) { ''11cd3e2e-fccb-42ad-ad00-878b93575e07'' } elseif ($AA) { ''ce933385-9390-45d1-9512-c8d228074e07'' }')
+    $null = $CommandText.AppendLine('    # Getting a valid UPN for the Application Instance')
+    $null = $CommandText.AppendLine('    $UPN = $Prefix + ($AccountName.Trim() -replace ''[^a-zA-Z0-9_\-]'', '''').ToLower()')
+    $null = $CommandText.AppendLine("    `$UPN = `$UPN.Substring(0, [System.Math]::Min(20, `$UPN.Length)) + '@$SipDomain'")
+    $null = $CommandText.AppendLine('    do {')
+    $null = $CommandText.AppendLine('        $UPNExist = try { Get-CsOnlineApplicationInstance -Identity $UPN -ErrorAction SilentlyContinue } catch { $null }')
+    $null = $CommandText.AppendLine('        if ([string]::IsNullOrEmpty($UPNExist)) {')
+    $null = $CommandText.AppendLine('            $valid = $true')
+    $null = $CommandText.AppendLine('        } else {')
+    $null = $CommandText.AppendLine('            $valid = $false')
+    $null = $CommandText.AppendLine('            $Random = -join ((97..122) | Get-Random -Count 4 | ForEach-Object { [char]$_ })')
+    $null = $CommandText.AppendLine('            $UPN = $Prefix + ($AccountName.Trim() -replace ''[^a-zA-Z0-9_\-]'', '''').ToLower()')
+    $null = $CommandText.AppendLine("            `$UPN = `$UPN.Substring(0, [System.Math]::Min(16, `$UPN.Length)) + `$Random + '@$SipDomain'")
+    $null = $CommandText.AppendLine('        }')
+    $null = $CommandText.AppendLine('    } until ($valid)')
+    $null = $CommandText.AppendLine('    # Creating the Application Instance')
+    $null = $CommandText.AppendLine('    try {')
+    $null = $CommandText.AppendLine('        $NewInstance = New-CsOnlineApplicationInstance -UserPrincipalName $UPN -ApplicationId $ApplicationId -DisplayName $Name')
+    $null = $CommandText.AppendLine('        $InstanceId = $NewInstance.ObjectID')
+    $null = $CommandText.AppendLine('        $InstanceUpn = $NewInstance.UserPrincipalName -replace "^$Prefix",''''')
+    $null = $CommandText.AppendLine('    } catch {')
+    $null = $CommandText.AppendLine('        Write-Warning "Unable to create application instance for ${Name}... Ending processing."')
+    $null = $CommandText.AppendLine('        Write-Warning $_.Exception')
+    $null = $CommandText.AppendLine('        exit')
+    $null = $CommandText.AppendLine('    }')
+    $null = $CommandText.AppendLine('    [PSCustomObject]@{')
+    $null = $CommandText.AppendLine('        InstanceId = $InstanceId')
+    $null = $CommandText.AppendLine('        InstanceUpn = $InstanceUpn')
+    $null = $CommandText.AppendLine('    }')
+    $null = $CommandText.AppendLine('}')
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("# Creating the application instances") | Out-Null
-    $CommandText.AppendLine("if (`$DeploymentStatus.ToLower() -eq `"new`" ) {") | Out-Null
-    $CommandText.Append("`t`$CQInstance = CreateApplicationInstance -AccountName `$CQAccountName -Name `$CQName -SipDomain `"$SipDomain`" -CQ") | Out-Null
-    if ($GenerateAccountsOnPrem) { 
-        $CommandText.AppendLine(" -Hybrid -OU `"$ResourceOU`"") | Out-Null 
-    }
-    else {
-        $CommandText.AppendLine() | Out-Null 
-    }
-    $CommandText.AppendLine("`t`$DeploymentStatus = `"CQAccountDeployed`"") | Out-Null
-    $CommandText.AppendLine("`t`$Config.CQName = (`$CQInstance.InstanceUpn -split '@')[0]") | Out-Null 
-    $CommandText.AppendLine("`t`$Config.DeploymentStatus = `$DeploymentStatus") | Out-Null
-    $CommandText.AppendLine("`t`$Config | Export-Csv -Path `$CsvPath -NoTypeInformation") | Out-Null
-    $CommandText.AppendLine("}") | Out-Null
+    $null = $CommandText.AppendLine('# Creating the application instances')
+    $null = $CommandText.AppendLine('if ($DeploymentStatus.ToLower() -eq ''new'') {')
+    $null = $CommandText.Append("    `$CQInstance = CreateApplicationInstance -AccountName `$CQAccountName -Name `$CQName -CQ")
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("if (`$DeploymentStatus.ToLower() -eq `"cqaccountdeployed`" ) {") | Out-Null
-    $CommandText.Append("`t`$AAInstance = CreateApplicationInstance -AccountName `$AAAccountName -Name `$AAName -SipDomain `"$SipDomain`" -AA") | Out-Null
-    if ($GenerateAccountsOnPrem) { 
-        $CommandText.AppendLine(" -Hybrid -OU `"$ResourceOU`"") | Out-Null 
-    }
-    else {
-        $CommandText.AppendLine() | Out-Null 
-    }
-    $CommandText.AppendLine("`t`$DeploymentStatus = `"AccountsDeployed`"") | Out-Null
-    $CommandText.AppendLine("`t`$Config.AAName = (`$AAInstance.InstanceUpn -split '@')[0]") | Out-Null 
-    $CommandText.AppendLine("`t`$Config.DeploymentStatus = `$DeploymentStatus") | Out-Null
-    $CommandText.AppendLine("`t`$Config | Export-Csv -Path `$CsvPath -NoTypeInformation") | Out-Null 
-    $CommandText.AppendLine("}") | Out-Null
-    $CommandText.AppendLine("if (`$GenerateAccountsOnly ) { Write-Warning `"Accounts Created, run script again without GenerateAccountsOnly switch to continue processing.`"; exit }") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine('    $DeploymentStatus = ''CQAccountDeployed''')
+    $null = $CommandText.AppendLine('    $Config.CQName = ($CQInstance.InstanceUpn -split ''@'')[0]')
+    $null = $CommandText.AppendLine('    $Config.DeploymentStatus = $DeploymentStatus')
+    $null = $CommandText.AppendLine('    $Config | Export-Csv -Path $CsvPath -NoTypeInformation')
+    $null = $CommandText.AppendLine('}')
 
-    $CommandText.AppendLine("if (`$DeploymentStatus.ToLower() -eq `"accountsdeployed`" ) {") | Out-Null
-    $CommandText.AppendLine("`t# Waiting the Call Queue and Auto Attendant Application Instances to replicate") | Out-Null
-    $CommandText.AppendLine("`tdo {") | Out-Null
-    $CommandText.AppendLine("`t`t`$ExistsOnline = `$false") | Out-Null
-    $CommandText.AppendLine("`t`t`$CQInstance = Get-CsOnlineApplicationInstance -Identity ('CQ-' + `$Config.CQName + `"@$SipDomain`")") | Out-Null
-    $CommandText.AppendLine("`t`t`$CQEndpoint = Get-CsOnlineApplicationEndpoint -Uri (`"sip:`" + 'CQ-' + `$Config.CQName + `"@$SipDomain`")") | Out-Null
-    $CommandText.AppendLine("`t`t`$AAInstance = Get-CsOnlineApplicationInstance -Identity ('AA-' + `$Config.AAName + `"@$SipDomain`")") | Out-Null
-    $CommandText.AppendLine("`t`t`$AAEndpoint = Get-CsOnlineApplicationEndpoint -Uri (`"sip:`" + 'AA-' + `$Config.AAName + `"@$SipDomain`")") | Out-Null
-    $CommandText.AppendLine("`t`tif(`$null -ne `$CQInstance -and `$null -ne `$CQEndpoint -and `$null -ne `$AAInstance -and `$null -ne `$AAEndpoint) {") | Out-Null
-    $CommandText.AppendLine("`t`t`t`$ExistsOnline = `$true") | Out-Null
-    $CommandText.AppendLine("`t`t}") | Out-Null
-    $CommandText.AppendLine("`t} until (`$ExistsOnline)") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine('if ($DeploymentStatus.ToLower() -eq ''cqaccountdeployed'') {')
+    $null = $CommandText.Append("    `$AAInstance = CreateApplicationInstance -AccountName `$AAAccountName -Name `$AAName -AA")
+    $null = $CommandText.AppendLine()
+    $null = $CommandText.AppendLine('    $DeploymentStatus = ''AccountsDeployed''')
+    $null = $CommandText.AppendLine('    $Config.AAName = ($AAInstance.InstanceUpn -split ''@'')[0]')
+    $null = $CommandText.AppendLine('    $Config.DeploymentStatus = $DeploymentStatus')
+    $null = $CommandText.AppendLine('    $Config | Export-Csv -Path $CsvPath -NoTypeInformation')
+    $null = $CommandText.AppendLine('}')
+    $null = $CommandText.AppendLine('if ($GenerateAccountsOnly) { Write-Warning ''Accounts Created, run script again without GenerateAccountsOnly switch to continue processing.''; exit }')
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("`t`$CQInstanceId = `$CQInstance.ObjectID") | Out-Null
-    $CommandText.AppendLine("`t`$AAInstanceId = `$AAInstance.ObjectID") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine('if ($DeploymentStatus.ToLower() -eq ''accountsdeployed'') {')
+    $null = $CommandText.AppendLine('    # Waiting the Call Queue and Auto Attendant Application Instances to replicate')
+    $null = $CommandText.AppendLine('    do {')
+    $null = $CommandText.AppendLine('        $ExistsOnline = $false')
+    $null = $CommandText.AppendLine('        try {')
+    $null = $CommandText.AppendLine("            `$CQInstance = Get-CsOnlineApplicationInstance -Identity ('CQ-{0}@$SipDomain' -f `$Config.CQName) -ErrorAction Stop")
+    $null = $CommandText.AppendLine("            `$AAInstance = Get-CsOnlineApplicationInstance -Identity ('AA-{0}@$SipDomain' -f `$Config.AAName) -ErrorAction Stop")
+    $null = $CommandText.AppendLine('            if($null -ne $CQInstance -and $null -ne $AAInstance) {')
+    $null = $CommandText.AppendLine('                $ExistsOnline = $true')
+    $null = $CommandText.AppendLine('            }')
+    $null = $CommandText.AppendLine('        } catch {}')
+    $null = $CommandText.AppendLine('    } until ($ExistsOnline)')
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("`t# Building the Call Queue") | Out-Null
-    $CommandText.AppendLine() | Out-Null
-    $CommandText.AppendLine("`t`$CallQueueParams = @{}") | Out-Null
+    $null = $CommandText.AppendLine('    $CQInstanceId = $CQInstance.ObjectID')
+    $null = $CommandText.AppendLine('    $AAInstanceId = $AAInstance.ObjectID')
+    $null = $CommandText.AppendLine()
+
+    $null = $CommandText.AppendLine('    # Building the Call Queue')
+    $null = $CommandText.AppendLine()
+    $null = $CommandText.AppendLine('    $CallQueueParams = @{}')
 
     $DefaultQueueAgentGroup = $ProcessedAgentGroups.Where( { $_.Identity -eq $DefaultQueue.AgentGroupIDList })[0]
     if (![string]::IsNullOrEmpty($DefaultQueueAgentGroup.Warnings)) {
-        $WarningStrings.AppendLine($DefaultQueueAgentGroup.Warnings) | Out-Null
+        $null = $WarningStrings.AppendLine($DefaultQueueAgentGroup.Warnings)
     }
 
     if ($null -eq $DefaultQueueAgentGroup) {
         Write-Warning "$($DefaultQueue.Name) has no assigned Agent Groups, this will not be processed further."
         continue
-        # Write-Warning "$FileName has no assigned Agent Groups"
-        # $WarningStrings.AppendLine("$($DefaultQueue.Name) has no assigned Agent Groups") | Out-Null
     }
-    $CallQueueParams["AllowOptOut"] = $DefaultQueueAgentGroup.ParticipationPolicy -eq 'Formal'     # AllowOptOut: Informal -> true, Formal -> false
+    $CallQueueParams['AllowOptOut'] = $DefaultQueueAgentGroup.ParticipationPolicy -eq 'Formal'     # AllowOptOut: Informal -> true, Formal -> false
 
     $RoundValueParams = @{
         InputTime   = $DefaultQueueAgentGroup.AgentAlertTime
@@ -1000,104 +964,102 @@ foreach ($Workflow in $CallQueues) {
         RoundTo     = 15
         MaximumTime = 180
     }
-    $CallQueueParams["AgentAlertTime"] = RoundValue @RoundValueParams
+    $CallQueueParams['AgentAlertTime'] = RoundValue @RoundValueParams
 
     if ($DefaultQueueAgentGroup.DistributionGroupAddress.Count -gt 0) {
-        $CommandText.AppendLine("`t# Adding Distribution Groups from AgentGroup to the Queue") | Out-Null
-        $CommandText.AppendLine("`t`$DGroups = [Collections.Generic.List[object]]::new()") | Out-Null
-        $CommandText.AppendLine("`t`$DGs = @(") | Out-Null
+        $null = $CommandText.AppendLine('    # Adding Distribution Groups from AgentGroup to the Queue')
+        $null = $CommandText.AppendLine('    $DGroups = [Collections.Generic.List[object]]::new()')
+        $null = $CommandText.AppendLine('    $DGs = @(')
         foreach ($DList in $DefaultQueueAgentGroup.DistributionGroupAddress) {
-            $CommandText.AppendLine("`t`t`"$DList`"") | Out-Null
+            $null = $CommandText.AppendLine("        '$DList'")
         }
-        $CommandText.AppendLine("`t)") | Out-Null
-        $CommandText.AppendLine("`tforeach (`$Dlist in `$DGs) {") | Out-Null
-        $CommandText.AppendLine("`t`t`$GroupId = try {") | Out-Null
-        $CommandText.AppendLine("`t`t(Find-CsGroup -SearchQuery `$Dlist -ExactMatchOnly `$true -MaxResults 1).Id.Guid") | Out-Null
-        $CommandText.AppendLine("`t`t} catch {") | Out-Null
-        $CommandText.AppendLine("`t`t`t`$null") | Out-Null
-        $CommandText.AppendLine("`t`t}") | Out-Null
-        $CommandText.AppendLine("`t`tif (`$null -ne `$GroupId) {") | Out-Null
-        $CommandText.AppendLine("`t`t`t`$DGroups.Add(`$GroupId) | Out-Null") | Out-Null
-        $CommandText.AppendLine("`t`t} else {") | Out-Null
-        $CommandText.AppendLine("`t`t`tWrite-Warning `"Could not find valid object for `$DList, skipping`"") | Out-Null
-        $CommandText.AppendLine("`t`t}") | Out-Null
-        $CommandText.AppendLine("`t}") | Out-Null
+        $null = $CommandText.AppendLine('    )')
+        $null = $CommandText.AppendLine('    foreach ($Dlist in $DGs) {')
+        $null = $CommandText.AppendLine('        $GroupId = try {')
+        $null = $CommandText.AppendLine('        (Find-CsGroup -SearchQuery $Dlist -ExactMatchOnly $true -MaxResults 1).Id.Guid')
+        $null = $CommandText.AppendLine('        } catch {')
+        $null = $CommandText.AppendLine('            $null')
+        $null = $CommandText.AppendLine('        }')
+        $null = $CommandText.AppendLine('        if ($null -ne $GroupId) {')
+        $null = $CommandText.AppendLine('            $DGroups.Add($GroupId) | Out-Null')
+        $null = $CommandText.AppendLine('        } else {')
+        $null = $CommandText.AppendLine('            Write-Warning "Could not find valid object for $DList, skipping"')
+        $null = $CommandText.AppendLine('        }')
+        $null = $CommandText.AppendLine('    }')
 
-        $CommandText.AppendLine("`tif (`$DGroups.Count -gt 0) {") | Out-Null
-        $CommandText.AppendLine("`t`t`$CallQueueParams[`"DistributionLists`"] = `$DGroups") | Out-Null
-        $CommandText.AppendLine("`t}") | Out-Null
-        $CommandText.AppendLine() | Out-Null
+        $null = $CommandText.AppendLine('    if ($DGroups.Count -gt 0) {')
+        $null = $CommandText.AppendLine('        $CallQueueParams[''DistributionLists''] = $DGroups')
+        $null = $CommandText.AppendLine('    }')
+        $null = $CommandText.AppendLine()
     }
 
     if ($DefaultQueueAgentGroup.AgentsByUri.Count -gt 0) {
-        $CommandText.AppendLine("`t# Adding Agent Uris from AgentGroup to the Queue") | Out-Null
-        $CommandText.AppendLine("`t`$AgentsByUri = [Collections.Generic.List[object]]::new()") | Out-Null
-        $CommandText.AppendLine("`t`$AgentUris = @(") | Out-Null
+        $null = $CommandText.AppendLine('    # Adding Agent Uris from AgentGroup to the Queue')
+        $null = $CommandText.AppendLine('    $AgentsByUri = [Collections.Generic.List[object]]@()')
+        $null = $CommandText.AppendLine('    $AgentUris = @(')
         $AgentCount = 1
         foreach ($AgentUri in $DefaultQueueAgentGroup.AgentsByUri) {
             if ($AgentCount -le 20) {
-                $CommandText.AppendLine("`t`t`"$AgentUri`"") | Out-Null
-            } else {
+                $null = $CommandText.AppendLine("        '$AgentUri'")
+            }
+            else {
                 if ($AgentCount -eq 21) {
-                    $WarningStrings.AppendLine("More than 20 agents assigned to queue, only first 20 will be added.") | Out-Null
+                    $null = $WarningStrings.AppendLine('More than 20 agents assigned to queue, only first 20 will be added.')
                 }
-                $CommandText.AppendLine("`t`t`# `"$AgentUri`"") | Out-Null
+                $null = $CommandText.AppendLine("        `# '$AgentUri'")
             }
             $AgentCount++
         }
-        $CommandText.AppendLine("`t)") | Out-Null
-        $CommandText.AppendLine("`tforeach (`$AgentUri in `$AgentUris) {") | Out-Null
-        $CommandText.AppendLine("`t`t`$Agent = try {") | Out-Null
-        $CommandText.AppendLine("`t`t`t(Get-CsOnlineUser -Identity `$AgentUri).ObjectID.Guid") | Out-Null
-        $CommandText.AppendLine("`t`t} catch {") | Out-Null
-        $CommandText.AppendLine("`t`t`t`$null") | Out-Null
-        $CommandText.AppendLine("`t`t}") | Out-Null
-        $CommandText.AppendLine("`t`tif (`$null -ne `$Agent) { ") | Out-Null
-        $CommandText.AppendLine("`t`t`t`$AgentsByUri.Add(`$Agent) | Out-Null") | Out-Null
-        $CommandText.AppendLine("`t`t} else {") | Out-Null
-        $CommandText.AppendLine("`t`t`tWrite-Warning `"Could not find valid object for `$AgentUri, skipping`"") | Out-Null
-        $CommandText.AppendLine("`t`t}") | Out-Null
-        $CommandText.AppendLine("`t}") | Out-Null
-        $CommandText.AppendLine("`tif (`$AgentsByUri.Count -gt 0) {") | Out-Null
-        $CommandText.AppendLine("`t`t`$CallQueueParams[`"Users`"] = `$AgentsByUri") | Out-Null
-        $CommandText.AppendLine("`t}") | Out-Null
-        $CommandText.AppendLine() | Out-Null
+        $null = $CommandText.AppendLine('    )')
+        $null = $CommandText.AppendLine('    foreach ($AgentUri in $AgentUris) {')
+        $null = $CommandText.AppendLine('        $Agent = try {')
+        $null = $CommandText.AppendLine('            (Get-CsOnlineUser -Identity $AgentUri -ErrorAction Stop).Identity')
+        $null = $CommandText.AppendLine('        } catch {')
+        $null = $CommandText.AppendLine('            $null')
+        $null = $CommandText.AppendLine('        }')
+        $null = $CommandText.AppendLine('        if ($null -ne $Agent) { ')
+        $null = $CommandText.AppendLine('            $AgentsByUri.Add($Agent)')
+        $null = $CommandText.AppendLine('        } else {')
+        $null = $CommandText.AppendLine('            Write-Warning "Could not find valid object for $AgentUri, skipping"')
+        $null = $CommandText.AppendLine('        }')
+        $null = $CommandText.AppendLine('    }')
+        $null = $CommandText.AppendLine('    if ($AgentsByUri.Count -gt 0) {')
+        $null = $CommandText.AppendLine('        $CallQueueParams[''Users''] = $AgentsByUri')
+        $null = $CommandText.AppendLine('    }')
+        $null = $CommandText.AppendLine()
     }
     elseif ( $DefaultQueueAgentGroup.DistributionGroupAddress.Count -eq 0 ) {
         Write-Warning "$($DefaultQueue.Name) has no users or distribution groups in its assigned Agent Groups, this will not be processed further."
         continue
-
-        # Write-Warning "$FileName has no users or distribution groups in its assigned Agent Groups"
-        # $WarningStrings.AppendLine("$($DefaultQueue.Name) has no users or distribution groups in its assigned Agent Groups") | Out-Null
     }
 
-    $CallQueueParams["RoutingMethod"] = if ( $DefaultQueueAgentGroup.RoutingMethod -eq "Parallel" ) { 
-        "Serial"
+    $CallQueueParams['RoutingMethod'] = if ( $DefaultQueueAgentGroup.RoutingMethod -eq 'Parallel' ) {
+        'Serial'
     }
     else {
-        $DefaultQueueAgentGroup.RoutingMethod 
+        $DefaultQueueAgentGroup.RoutingMethod
     }
 
-    $CommandText.AppendLine("`t# Configuring Overflow Action") | Out-Null
+    $null = $CommandText.AppendLine('    # Configuring Overflow Action')
     $ConvertActionParams = @{
         FlowName                    = $DefaultQueue.Name
         URI                         = $DefaultQueue.OverflowUri
         QueueId                     = $DefaultQueue.OverflowQueueID
         Action                      = $DefaultQueue.OverflowAction
         CommandText                 = $CommandText
-        CommandHashName             = "CallQueueParams"
-        ActionName                  = "OverflowAction"
-        ActionTargetName            = "OverflowActionTarget"
+        CommandHashName             = 'CallQueueParams'
+        ActionName                  = 'OverflowAction'
+        ActionTargetName            = 'OverflowActionTarget'
         AudioFilePromptLocation     = $DefaultQueue.OverflowAudioStoredLocation
         AudioFilePromptOriginalName = $DefaultQueue.OverflowAudioOriginalName
         TextPrompt                  = $DefaultQueue.OverflowTextPrompt
-        AudioPromptParamName        = "OverflowSharedVoicemailAudioFilePrompt"
-        TextPromptParamName         = "OverflowSharedVoicemailTextToSpeechPrompt"
-        Prepend                     = "`t"
+        AudioPromptParamName        = 'OverflowSharedVoicemailAudioFilePrompt'
+        TextPromptParamName         = 'OverflowSharedVoicemailTextToSpeechPrompt'
+        Prepend                     = '    '
     }
     $warn = ConvertNonQuestionAction @ConvertActionParams
     if (![string]::IsNullOrEmpty($warn)) {
-        $WarningStrings.AppendLine($warn) | Out-Null
+        $null = $WarningStrings.AppendLine($warn)
     }
     if ($null -ne $DefaultQueue.OverflowThreshold) {
         $RoundValueParams = @{
@@ -1106,30 +1068,30 @@ foreach ($Workflow in $CallQueues) {
             RoundTo     = 1
             MaximumTime = 200
         }
-        $CallQueueParams["OverflowThreshold"] = RoundValue @RoundValueParams
+        $CallQueueParams['OverflowThreshold'] = RoundValue @RoundValueParams
     }
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("`t# Configuring Timeout Action") | Out-Null
+    $null = $CommandText.AppendLine('    # Configuring Timeout Action')
     $ConvertActionParams = @{
         FlowName                    = $DefaultQueue.Name
         URI                         = $DefaultQueue.TimeoutUri
         Action                      = $DefaultQueue.TimeoutAction
         QueueId                     = $DefaultQueue.TimeoutQueueID
         CommandText                 = $CommandText
-        CommandHashName             = "CallQueueParams"
-        ActionName                  = "TimeoutAction"
-        ActionTargetName            = "TimeoutActionTarget"
+        CommandHashName             = 'CallQueueParams'
+        ActionName                  = 'TimeoutAction'
+        ActionTargetName            = 'TimeoutActionTarget'
         AudioFilePromptLocation     = $DefaultQueue.TimeoutAudioStoredLocation
         AudioFilePromptOriginalName = $DefaultQueue.TimeoutAudioOriginalName
         TextPrompt                  = $DefaultQueue.TimeoutTextPrompt
-        AudioPromptParamName        = "TimeoutSharedVoicemailAudioFilePrompt"
-        TextPromptParamName         = "TimeoutSharedVoicemailTextToSpeechPrompt"
-        Prepend                     = "`t"
+        AudioPromptParamName        = 'TimeoutSharedVoicemailAudioFilePrompt'
+        TextPromptParamName         = 'TimeoutSharedVoicemailTextToSpeechPrompt'
+        Prepend                     = '    '
     }
     $warn = ConvertNonQuestionAction @ConvertActionParams
     if (![string]::IsNullOrEmpty($warn)) {
-        $WarningStrings.AppendLine($warn) | Out-Null
+        $null = $WarningStrings.AppendLine($warn)
     }
     if ($null -ne $DefaultQueue.TimeoutThreshold) {
         $RoundValueParams = @{
@@ -1138,146 +1100,144 @@ foreach ($Workflow in $CallQueues) {
             RoundTo     = 15
             MaximumTime = 2700
         }
-        $CallQueueParams["TimeoutThreshold"] = RoundValue @RoundValueParams
+        $CallQueueParams['TimeoutThreshold'] = RoundValue @RoundValueParams
     }
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine()
 
     if (![string]::IsNullOrEmpty($Workflow.CustomMusicOnHoldStoredLocation)) {
-        $CommandText.AppendLine("`t# Importing Custom Hold Music audio file") | Out-Null
-        AddFileImportScript -ApplicationId HuntGroup -StoredLocation $Workflow.CustomMusicOnHoldStoredLocation -FileName $Workflow.CustomMusicOnHoldFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend "`t"
-        $CommandText.AppendLine() | Out-Null
-        $CallQueueParams['MusicOnHoldAudioFileId'] = "`$(`$FileId.Id)"
+        $null = $CommandText.AppendLine('    # Importing Custom Hold Music audio file')
+        AddFileImportScript -ApplicationId HuntGroup -StoredLocation $Workflow.CustomMusicOnHoldStoredLocation -FileName $Workflow.CustomMusicOnHoldFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend '    '
+        $null = $CommandText.AppendLine()
+        $CallQueueParams['MusicOnHoldAudioFileId'] = '$FileId.Id'
     }
     else {
         $CallQueueParams['UseDefaultMusicOnHold'] = $true
     }
 
     # PresenceBasedRouting (off by default)
-    $CallQueueParams["PresenceBasedRouting"] = $true
-    
+    $CallQueueParams['PresenceBasedRouting'] = $true
+
     # ConferenceMode (off by default)
-    # $CallQueueParams["ConferenceMode"] = $true
+    # $CallQueueParams['ConferenceMode'] = $true
 
     # LanguageId handling for sharedvoicemail? we can set this regardless
     # OverflowSharedVoicemailAudioFilePrompt
-    # 
 
-    $CommandText.AppendLine("`t# Adding remaining queue configuration information") | Out-Null
-    $CommandString = HashTableToDeclareString -Hashtable $CallQueueParams -VariableName "CallQueueParams" -Prepend "`t"
-    $CommandText.AppendLine($CommandString) | Out-Null
+    $null = $CommandText.AppendLine('    # Adding remaining queue configuration information')
+    $CommandString = HashTableToDeclareString -Hashtable $CallQueueParams -VariableName 'CallQueueParams' -Prepend '    '
+    $null = $CommandText.AppendLine($CommandString)
 
-    $CommandText.AppendLine("`t# Creating the Call Queue") | Out-Null
-    $CommandText.AppendLine("`ttry {") | Out-Null
-    $CommandText.AppendLine("`t`t`$CallQueue = New-CsCallQueue @CallQueueParams") | Out-Null
-    $CommandText.AppendLine("`t} catch {") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Error `"Unable to create call queue `$CQAccountName!`"") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
-    $CommandText.AppendLine("`t`texit") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine('    # Creating the Call Queue')
+    $null = $CommandText.AppendLine('    try {')
+    $null = $CommandText.AppendLine('        $CallQueue = New-CsCallQueue @CallQueueParams')
+    $null = $CommandText.AppendLine('    } catch {')
+    $null = $CommandText.AppendLine('        Write-Error "Unable to create call queue $CQAccountName!"')
+    $null = $CommandText.AppendLine('        Write-Warning $_.Exception')
+    $null = $CommandText.AppendLine('        exit')
+    $null = $CommandText.AppendLine('    }')
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("`t# Creating Call Queue Application Instance Association") | Out-Null
-    $CommandText.AppendLine("`ttry {") | Out-Null
-    $CommandText.AppendLine("`t`t`$CQAssoc = New-CsOnlineApplicationInstanceAssociation -ConfigurationType CallQueue -ConfigurationId `$(`$CallQueue.Identity) -Identities `$CQInstanceId") | Out-Null
-    $CommandText.AppendLine("`t} catch {") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `"Unable to create application association for `$CQName ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
-    $CommandText.AppendLine("`t`texit") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine('    # Creating Call Queue Application Instance Association')
+    $null = $CommandText.AppendLine('    try {')
+    $null = $CommandText.AppendLine('        $CQAssoc = New-CsOnlineApplicationInstanceAssociation -ConfigurationType CallQueue -ConfigurationId $($CallQueue.Identity) -Identities $CQInstanceId')
+    $null = $CommandText.AppendLine('    } catch {')
+    $null = $CommandText.AppendLine('        Write-Warning "Unable to create application association for $CQName ending processing."')
+    $null = $CommandText.AppendLine('        Write-Warning $_.Exception')
+    $null = $CommandText.AppendLine('        exit')
+    $null = $CommandText.AppendLine('    }')
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("`t# Building the Auto Attendant") | Out-Null
-    $CommandText.AppendLine() | Out-Null
-    $CommandText.AppendLine("`t# Building the Auto Attendant Default Action") | Out-Null
-    $CommandText.AppendLine("`t`$DefaultAction = New-CsAutoAttendantCallableEntity -Identity `$CQInstanceId -Type ApplicationEndpoint") | Out-Null
-    $CommandText.AppendLine("`t`$DefaultMenuOption = New-CsAutoAttendantMenuOption -Action TransferCallToTarget -DtmfResponse Automatic -CallTarget `$DefaultAction") | Out-Null
-    $CommandText.AppendLine("`t`$DefaultMenu = New-CsAutoAttendantMenu -Name `"Default Menu`" -MenuOptions @(`$DefaultMenuOption)") | Out-Null
+    $null = $CommandText.AppendLine('    # Building the Auto Attendant')
+    $null = $CommandText.AppendLine()
+    $null = $CommandText.AppendLine('    # Building the Auto Attendant Default Action')
+    $null = $CommandText.AppendLine('    $DefaultAction = New-CsAutoAttendantCallableEntity -Identity $CQInstanceId -Type ApplicationEndpoint')
+    $null = $CommandText.AppendLine('    $DefaultMenuOption = New-CsAutoAttendantMenuOption -Action TransferCallToTarget -DtmfResponse Automatic -CallTarget $DefaultAction')
+    $null = $CommandText.AppendLine('    $DefaultMenu = New-CsAutoAttendantMenu -Name ''Default Menu'' -MenuOptions @($DefaultMenuOption)')
 
     if (![string]::IsNullOrWhiteSpace($Workflow.DefaultActionPromptAudioFilePromptStoredLocation)) {
-        AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.DefaultActionPromptAudioFilePromptStoredLocation -FileName $Workflow.DefaultActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend "`t"
-        $CommandText.AppendLine("`t`$DefaultGreetingPrompt = New-CsAutoAttendantPrompt -AudioFilePrompt `$FileId") | Out-Null
-        $CommandText.AppendLine("`t`$DefaultCallFlow = New-CsAutoAttendantCallFlow -Name `"Default Call Flow`" -Greetings @(`$DefaultGreetingPrompt) -Menu `$DefaultMenu") | Out-Null
+        AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.DefaultActionPromptAudioFilePromptStoredLocation -FileName $Workflow.DefaultActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend '    '
+        $null = $CommandText.AppendLine('    $DefaultGreetingPrompt = New-CsAutoAttendantPrompt -AudioFilePrompt $FileId')
+        $null = $CommandText.AppendLine('    $DefaultCallFlow = New-CsAutoAttendantCallFlow -Name ''Default Call Flow'' -Greetings @($DefaultGreetingPrompt) -Menu $DefaultMenu')
     }
     elseif (![string]::IsNullOrWhiteSpace($Workflow.DefaultActionPromptTextToSpeechPrompt)) {
-        $CommandText.AppendLine("`t`$DefaultGreetingPrompt = New-CsAutoAttendantPrompt -TextToSpeechPrompt `"$($Workflow.DefaultActionPromptTextToSpeechPrompt)`"") | Out-Null
-        $CommandText.AppendLine("`t`$DefaultCallFlow = New-CsAutoAttendantCallFlow -Name `"Default Call Flow`" -Greetings @(`$DefaultGreetingPrompt) -Menu `$DefaultMenu") | Out-Null
+        $null = $CommandText.AppendLine("    `$DefaultGreetingPrompt = New-CsAutoAttendantPrompt -TextToSpeechPrompt '$($Workflow.DefaultActionPromptTextToSpeechPrompt)'")
+        $null = $CommandText.AppendLine('    $DefaultCallFlow = New-CsAutoAttendantCallFlow -Name ''Default Call Flow'' -Greetings @($DefaultGreetingPrompt) -Menu $DefaultMenu')
     }
     else {
-        $CommandText.AppendLine("`t`$DefaultCallFlow = New-CsAutoAttendantCallFlow -Name `"Default Call Flow`" -Menu `$DefaultMenu") | Out-Null
+        $null = $CommandText.AppendLine('    $DefaultCallFlow = New-CsAutoAttendantCallFlow -Name ''Default Call Flow'' -Menu $DefaultMenu')
     }
-    $CommandText.AppendLine() | Out-Null
 
     # Add logic for business hours here
     if ($null -ne $Workflow.BusinessHoursID) {
-        $CommandText.AppendLine() | Out-Null
-        $CommandText.AppendLine("`t# Building the Auto Attendant After Hours Action") | Out-Null
+        $null = $CommandText.AppendLine()
+        $null = $CommandText.AppendLine('    # Building the Auto Attendant After Hours Action')
         $BusinessHours = @($HoursOfBusiness).Where( { $_.Identity.InstanceID.Guid -eq $Workflow.BusinessHoursID })[0]
         $HoursName = [regex]::Replace($BusinessHours.Name, '_?[A-Fa-f0-9]{8}(?:-?[A-Fa-f0-9]{4}){3}-?[A-Fa-f0-9]{12}$', '')
-        $CommandText.AppendLine("`t`$AfterHoursSchedule = @(Get-CsOnlineSchedule).Where({ `$_.Name -eq `"$HoursName`" })[0]") | Out-Null
-        $CommandText.AppendLine("`tif (`$null -eq `$AfterHoursSchedule) {") | Out-Null
-        $CommandText.AppendLine("`t`t`$OnlineScheduleParams = @{") | Out-Null
-        $CommandText.AppendLine("`t`t`tName = `"$HoursName`"") | Out-Null
-        $CommandText.AppendLine("`t`t`tWeeklyRecurrentSchedule = `$true") | Out-Null
-        $CommandText.AppendLine("`t`t`tComplement = `$true") | Out-Null
-        $CommandText.AppendLine("`t`t}") | Out-Null
+        $null = $CommandText.AppendLine("    `$AfterHoursSchedule = @(Get-CsOnlineSchedule).Where({ `$_.Name -eq '$HoursName' })[0]")
+        $null = $CommandText.AppendLine('    if ($null -eq $AfterHoursSchedule) {')
+        $null = $CommandText.AppendLine('        $OnlineScheduleParams = @{')
+        $null = $CommandText.AppendLine("            Name = '$HoursName'")
+        $null = $CommandText.AppendLine('            WeeklyRecurrentSchedule = $true')
+        $null = $CommandText.AppendLine('            Complement = $true')
+        $null = $CommandText.AppendLine('        }')
         if (![string]::IsNullOrEmpty($BusinessHours.MondayHours1) -or ![string]::IsNullOrEmpty($BusinessHours.MondayHours2)) {
-            $CommandText.AppendLine("`t`t`$OnlineScheduleParams['MondayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.MondayHours1 $BusinessHours.MondayHours2)") | Out-Null
+            $null = $CommandText.AppendLine("        `$OnlineScheduleParams['MondayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.MondayHours1 $BusinessHours.MondayHours2)")
         }
         if (![string]::IsNullOrEmpty($BusinessHours.TuesdayHours1) -or ![string]::IsNullOrEmpty($BusinessHours.TuesdayHours2)) {
-            $CommandText.AppendLine("`t`t`$OnlineScheduleParams['TuesdayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.TuesdayHours1 $BusinessHours.TuesdayHours2)") | Out-Null
+            $null = $CommandText.AppendLine("        `$OnlineScheduleParams['TuesdayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.TuesdayHours1 $BusinessHours.TuesdayHours2)")
         }
         if (![string]::IsNullOrEmpty($BusinessHours.WednesdayHours1) -or ![string]::IsNullOrEmpty($BusinessHours.WednesdayHours2)) {
-            $CommandText.AppendLine("`t`t`$OnlineScheduleParams['WednesdayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.WednesdayHours1 $BusinessHours.WednesdayHours2)") | Out-Null
+            $null = $CommandText.AppendLine("        `$OnlineScheduleParams['WednesdayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.WednesdayHours1 $BusinessHours.WednesdayHours2)")
         }
         if (![string]::IsNullOrEmpty($BusinessHours.ThursdayHours1) -or ![string]::IsNullOrEmpty($BusinessHours.ThursdayHours2)) {
-            $CommandText.AppendLine("`t`t`$OnlineScheduleParams['ThursdayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.ThursdayHours1 $BusinessHours.ThursdayHours2)") | Out-Null
+            $null = $CommandText.AppendLine("        `$OnlineScheduleParams['ThursdayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.ThursdayHours1 $BusinessHours.ThursdayHours2)")
         }
         if (![string]::IsNullOrEmpty($BusinessHours.FridayHours1) -or ![string]::IsNullOrEmpty($BusinessHours.FridayHours2)) {
-            $CommandText.AppendLine("`t`t`$OnlineScheduleParams['FridayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.FridayHours1 $BusinessHours.FridayHours2)") | Out-Null
+            $null = $CommandText.AppendLine("        `$OnlineScheduleParams['FridayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.FridayHours1 $BusinessHours.FridayHours2)")
         }
         if (![string]::IsNullOrEmpty($BusinessHours.SaturdayHours1) -or ![string]::IsNullOrEmpty($BusinessHours.SaturdayHours2)) {
-            $CommandText.AppendLine("`t`t`$OnlineScheduleParams['SaturdayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.SaturdayHours1 $BusinessHours.SaturdayHours2)") | Out-Null
+            $null = $CommandText.AppendLine("        `$OnlineScheduleParams['SaturdayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.SaturdayHours1 $BusinessHours.SaturdayHours2)")
         }
         if (![string]::IsNullOrEmpty($BusinessHours.SundayHours1) -or ![string]::IsNullOrEmpty($BusinessHours.SundayHours2)) {
-            $CommandText.AppendLine("`t`t`$OnlineScheduleParams['SundayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.SundayHours1 $BusinessHours.SundayHours2)") | Out-Null
+            $null = $CommandText.AppendLine("        `$OnlineScheduleParams['SundayHours'] = $(ConvertFrom-BusinessHoursToTimeRange $BusinessHours.SundayHours1 $BusinessHours.SundayHours2)")
         }
-        $CommandText.AppendLine("`t`t`$AfterHoursSchedule = New-CsOnlineSchedule @OnlineScheduleParams") | Out-Null
-        $CommandText.AppendLine("`t}") | Out-Null
+        $null = $CommandText.AppendLine('        $AfterHoursSchedule = New-CsOnlineSchedule @OnlineScheduleParams')
+        $null = $CommandText.AppendLine('    }')
 
-        $CommandText.AppendLine("`t`$OptionParams = @{}") | Out-Null
+        $null = $CommandText.AppendLine('    $OptionParams = @{}')
         $ConvertActionParams = @{
             FlowName         = $DefaultQueue.Name
             URI              = $Workflow.NonBusinessHoursActionURI
             QueueId          = $DefaultQueue.NonBusinessHoursActionQueueID
             Action           = $DefaultQueue.NonBusinessHoursActionAction
             CommandText      = $CommandText
-            CommandHashName  = "OptionParams"
-            ActionName       = "Action"
-            ActionTargetName = "CallTarget"
+            CommandHashName  = 'OptionParams'
+            ActionName       = 'Action'
+            ActionTargetName = 'CallTarget'
             AAMenuOption     = $true
-            Prepend          = "`t"
+            Prepend          = ''
         }
         $warn = ConvertNonQuestionAction @ConvertActionParams
         if (![string]::IsNullOrEmpty($warn)) {
-            $WarningStrings.AppendLine($warn) | Out-Null
+            $null = $WarningStrings.AppendLine($warn)
         }
 
-        $CommandText.AppendLine("`t`$AutomaticMenuOption = New-CsAutoAttendantMenuOption -DtmfResponse Automatic @OptionParams") | Out-Null
-        $CommandText.AppendLine("`t`$AfterHoursMenu = New-CsAutoAttendantMenu -Name `"After Hours Menu`" -MenuOptions @(`$AutomaticMenuOption)") | Out-Null
+        $null = $CommandText.AppendLine('    $AutomaticMenuOption = New-CsAutoAttendantMenuOption -DtmfResponse Automatic @OptionParams')
+        $null = $CommandText.AppendLine('    $AfterHoursMenu = New-CsAutoAttendantMenu -Name ''After Hours Menu'' -MenuOptions @($AutomaticMenuOption)')
         if (![string]::IsNullOrWhiteSpace($Workflow.NonBusinessHoursActionPromptTextToSpeechPrompt)) {
-            $CommandText.AppendLine("`t`$AfterHoursGreetingPrompt = New-CsAutoAttendantPrompt -TextToSpeechPrompt `"$($Workflow.NonBusinessHoursActionPromptTextToSpeechPrompt)`"") | Out-Null
-            $CommandText.AppendLine("`t`$AfterHoursCallFlow = New-CsAutoAttendantCallFlow -Name `"After Hours Call Flow`" -Greetings @(`$AfterHoursGreetingPrompt) -Menu `$AfterHoursMenu") | Out-Null
+            $null = $CommandText.AppendLine("    `$AfterHoursGreetingPrompt = New-CsAutoAttendantPrompt -TextToSpeechPrompt '$($Workflow.NonBusinessHoursActionPromptTextToSpeechPrompt)'")
+            $null = $CommandText.AppendLine('    $AfterHoursCallFlow = New-CsAutoAttendantCallFlow -Name ''After Hours Call Flow'' -Greetings @($AfterHoursGreetingPrompt) -Menu $AfterHoursMenu')
         }
         elseif (![string]::IsNullOrEmpty($Workflow.NonBusinessHoursActionPromptAudioFilePromptStoredLocation)) {
-            AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.NonBusinessHoursActionPromptAudioFilePromptStoredLocation -FileName $Workflow.NonBusinessHoursActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend "`t"
-            $CommandText.AppendLine("`t`$AfterHoursGreetingPrompt = New-CsAutoAttendantPrompt -AudioFilePrompt `$FileId") | Out-Null
-            $CommandText.AppendLine("`t`$AfterHoursCallFlow = New-CsAutoAttendantCallFlow -Name `"After Hours Call Flow`" -Greetings @(`$AfterHoursGreetingPrompt) -Menu `$AfterHoursMenu") | Out-Null
+            AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.NonBusinessHoursActionPromptAudioFilePromptStoredLocation -FileName $Workflow.NonBusinessHoursActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend '    '
+            $null = $CommandText.AppendLine('    $AfterHoursGreetingPrompt = New-CsAutoAttendantPrompt -AudioFilePrompt $FileId')
+            $null = $CommandText.AppendLine('    $AfterHoursCallFlow = New-CsAutoAttendantCallFlow -Name ''After Hours Call Flow'' -Greetings @($AfterHoursGreetingPrompt) -Menu $AfterHoursMenu')
         }
         else {
-            $CommandText.AppendLine("`t`$AfterHoursCallFlow = New-CsAutoAttendantCallFlow -Name `"After Hours Call Flow`" -Menu `$AfterHoursMenu") | Out-Null
+            $null = $CommandText.AppendLine('    $AfterHoursCallFlow = New-CsAutoAttendantCallFlow -Name ''After Hours Call Flow'' -Menu $AfterHoursMenu')
         }
-        
-        $CommandText.AppendLine("`t`$AfterHoursCallHandlingAssociation = New-CsAutoAttendantCallHandlingAssociation -Type AfterHours -ScheduleId `$AfterHoursSchedule.Id -CallFlowId `$AfterHoursCallFlow.Id") | Out-Null
+
+        $null = $CommandText.AppendLine('    $AfterHoursCallHandlingAssociation = New-CsAutoAttendantCallHandlingAssociation -Type AfterHours -ScheduleId $AfterHoursSchedule.Id -CallFlowId $AfterHoursCallFlow.Id')
     }
 
     $c = 0
@@ -1286,195 +1246,209 @@ foreach ($Workflow in $CallQueues) {
         if ($null -eq $HolidayId) {
             continue
         }
-        $CommandText.AppendLine() | Out-Null
-        $CommandText.AppendLine("`t# Building the Auto Attendant Holiday Hours Action $c") | Out-Null
+        $null = $CommandText.AppendLine()
+        $null = $CommandText.AppendLine("    # Building the Auto Attendant Holiday Hours Action $c")
         $HolidaySet = @($HolidaySets).Where( { $_.Identity.InstanceID.Guid -eq $HolidayId })[0]
         $HolidayName = [regex]::Replace($HolidaySet.Name, '_?[A-Fa-f0-9]{8}(?:-?[A-Fa-f0-9]{4}){3}-?[A-Fa-f0-9]{12}$', '')
-        $CommandText.AppendLine("`t`$HolidaySchedule = @(Get-CsOnlineSchedule).Where({ `$_.Name -eq `"$HolidayName`" })[0]") | Out-Null
-        $CommandText.AppendLine("`tif (`$null -eq `$HolidaySchedule) {") | Out-Null
-        $CommandText.AppendLine("`t`t`$OnlineScheduleParams = @{") | Out-Null
-        $CommandText.AppendLine("`t`t`tName = `"$HolidayName`"") | Out-Null
-        $CommandText.AppendLine("`t`t`tFixedSchedule = `$true") | Out-Null
-        $CommandText.AppendLine("`t`t}") | Out-Null
+        $null = $CommandText.AppendLine("    `$HolidaySchedule = @(Get-CsOnlineSchedule).Where({ `$_.Name -eq '$HolidayName' })[0]")
+        $null = $CommandText.AppendLine('    if ($null -eq $HolidaySchedule) {')
+        $null = $CommandText.AppendLine('        $OnlineScheduleParams = @{')
+        $null = $CommandText.AppendLine("            Name = '$HolidayName'")
+        $null = $CommandText.AppendLine('            FixedSchedule = $true')
+        $null = $CommandText.AppendLine('        }')
 
-        $CommandText.AppendLine("`t`t`$DateTimeRanges = @()") | Out-Null
+        $null = $CommandText.AppendLine('        $DateTimeRanges = @()')
         foreach ($HolidayRange in $HolidaySet.HolidayList) {
             $StartDate = $HolidayRange.StartDate.ToString('d/M/yyyy H:mm')
             $EndDate = $HolidayRange.EndDate.ToString('d/M/yyyy H:mm')
-            $CommandText.AppendLine("`t`t`$dt = New-CsOnlineDateTimeRange -Start `"$StartDate`" -End `"$EndDate`"") | Out-Null
-            $CommandText.AppendLine("`t`t`$DateTimeRanges += `$dt") | Out-Null
+            $null = $CommandText.AppendLine("        `$dt = New-CsOnlineDateTimeRange -Start '$StartDate' -End '$EndDate'")
+            $null = $CommandText.AppendLine('        $DateTimeRanges += $dt')
         }
-        $CommandText.AppendLine("`t`t`$OnlineScheduleParams[`"DateTimeRanges`"] = `$DateTimeRanges") | Out-Null
-        $CommandText.AppendLine("`t`t`$HolidaySchedule = New-CsOnlineSchedule @OnlineScheduleParams") | Out-Null
-        $CommandText.AppendLine("`t}") | Out-Null
+        $null = $CommandText.AppendLine('        $OnlineScheduleParams[''DateTimeRanges''] = $DateTimeRanges')
+        $null = $CommandText.AppendLine('        $HolidaySchedule = New-CsOnlineSchedule @OnlineScheduleParams')
+        $null = $CommandText.AppendLine('    }')
 
-        $CommandText.AppendLine("`t`$OptionParams = @{}") | Out-Null
+        $null = $CommandText.AppendLine('    $OptionParams = @{}')
         $ConvertActionParams = @{
             FlowName         = $DefaultQueue.Name
             URI              = $Workflow.HolidayActionURI
             QueueId          = $DefaultQueue.HolidayActionQueueID
             Action           = $DefaultQueue.HolidayActionAction
             CommandText      = $CommandText
-            CommandHashName  = "OptionParams"
-            ActionName       = "Action"
-            ActionTargetName = "CallTarget"
+            CommandHashName  = 'OptionParams'
+            ActionName       = 'Action'
+            ActionTargetName = 'CallTarget'
             AAMenuOption     = $true
-            Prepend          = "`t"
+            Prepend          = '    '
         }
         $warn = ConvertNonQuestionAction @ConvertActionParams
         if (![string]::IsNullOrEmpty($warn)) {
-            $WarningStrings.AppendLine($warn) | Out-Null
+            $null = $WarningStrings.AppendLine($warn)
         }
 
-        $CommandText.AppendLine("`t`$HolidayMenuOption = New-CsAutoAttendantMenuOption -DtmfResponse Automatic @OptionParams") | Out-Null
-        $CommandText.AppendLine("`t`$HolidayMenu = New-CsAutoAttendantMenu -Name `"Holiday Menu`" -MenuOptions @(`$HolidayMenuOption)") | Out-Null
+        $null = $CommandText.AppendLine('    $HolidayMenuOption = New-CsAutoAttendantMenuOption -DtmfResponse Automatic @OptionParams')
+        $null = $CommandText.AppendLine('    $HolidayMenu = New-CsAutoAttendantMenu -Name ''Holiday Menu'' -MenuOptions @($HolidayMenuOption)')
         if (![string]::IsNullOrEmpty($Workflow.HolidayActionPromptTextToSpeechPrompt)) {
-            $CommandText.AppendLine("`t`$HolidayGreetingPrompt = New-CsAutoAttendantPrompt -TextToSpeechPrompt `"$($Workflow.HolidayActionPromptTextToSpeechPrompt)`"") | Out-Null
-            $CommandText.AppendLine("`t`$HolidayCallFlow$c = New-CsAutoAttendantCallFlow -Name `"Holiday Call Flow $c`" -Greetings @(`$HolidayGreetingPrompt) -Menu `$HolidayMenu") | Out-Null
+            $null = $CommandText.AppendLine("    `$HolidayGreetingPrompt = New-CsAutoAttendantPrompt -TextToSpeechPrompt '$($Workflow.HolidayActionPromptTextToSpeechPrompt)'")
+            $null = $CommandText.AppendLine("    `$HolidayCallFlow$c = New-CsAutoAttendantCallFlow -Name 'Holiday Call Flow $c' -Greetings @(`$HolidayGreetingPrompt) -Menu `$HolidayMenu")
         }
         elseif (![string]::IsNullOrEmpty($Workflow.HolidayActionPromptAudioFilePromptStoredLocation)) {
-            AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.HolidayActionPromptAudioFilePromptStoredLocation -FileName $Workflow.HolidayActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend "`t"
-            $CommandText.AppendLine("`t`$HolidayGreetingPrompt = New-CsAutoAttendantPrompt -AudioFilePrompt `$FileId") | Out-Null
-            $CommandText.AppendLine("`t`$HolidayCallFlow$c = New-CsAutoAttendantCallFlow -Name `"Holiday Call Flow $c`" -Greetings @(`$HolidayGreetingPrompt) -Menu `$HolidayMenu") | Out-Null
+            AddFileImportScript -ApplicationId OrgAutoAttendant -StoredLocation $Workflow.HolidayActionPromptAudioFilePromptStoredLocation -FileName $Workflow.HolidayActionPromptAudioFilePromptOriginalFileName -CommandText $CommandText -WarningStrings $WarningStrings -Prepend '    '
+            $null = $CommandText.AppendLine('    $HolidayGreetingPrompt = New-CsAutoAttendantPrompt -AudioFilePrompt $FileId')
+            $null = $CommandText.AppendLine("    `$HolidayCallFlow$c = New-CsAutoAttendantCallFlow -Name 'Holiday Call Flow $c' -Greetings @(`$HolidayGreetingPrompt) -Menu `$HolidayMenu")
         }
         else {
-            $CommandText.AppendLine("`t`$HolidayCallFlow$c = New-CsAutoAttendantCallFlow -Name `"Holiday Call Flow $c`" -Menu `$HolidayMenu") | Out-Null
+            $null = $CommandText.AppendLine("    `$HolidayCallFlow$c = New-CsAutoAttendantCallFlow -Name 'Holiday Call Flow $c' -Menu `$HolidayMenu")
         }
-        
-        $CommandText.AppendLine("`t`$HolidayCallHandlingAssociation$c = New-CsAutoAttendantCallHandlingAssociation -Type Holiday -ScheduleId `$HolidaySchedule.Id -CallFlowId `$HolidayCallFlow$c.Id") | Out-Null
+
+        $null = $CommandText.AppendLine("    `$HolidayCallHandlingAssociation$c = New-CsAutoAttendantCallHandlingAssociation -Type Holiday -ScheduleId `$HolidaySchedule.Id -CallFlowId `$HolidayCallFlow$c.Id")
     }
 
-    $CommandText.AppendLine("`t# Creating the Auto Attendant") | Out-Null
-    $CommandText.AppendLine("`t`$AAParams = @{") | Out-Null
-    $CommandText.AppendLine("`t`tName            = `"`$AAName`"") | Out-Null
-    $CommandText.AppendLine("`t`tDefaultCallFlow = `$DefaultCallFlow") | Out-Null
-    $CommandText.AppendLine("`t`tLanguage        = `"$($Workflow.Language)`"") | Out-Null
-    $CommandText.AppendLine("`t`tTimeZoneId      = `"$($Workflow.TimeZone)`"") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
+    $null = $CommandText.AppendLine()
+    $null = $CommandText.AppendLine('    # Creating the Auto Attendant')
+    $null = $CommandText.AppendLine('    $AAParams = @{')
+    $null = $CommandText.AppendLine('        Name            = $AAName')
+    $null = $CommandText.AppendLine('        DefaultCallFlow = $DefaultCallFlow')
+    $null = $CommandText.AppendLine("        Language        = '$($Workflow.Language)'")
+    $null = $CommandText.AppendLine("        TimeZoneId      = '$($Workflow.TimeZone)'")
+    $null = $CommandText.AppendLine("        ErrorAction     = 'Stop'")
+    $null = $CommandText.AppendLine('    }')
 
     if ($null -ne $Workflow.BusinessHoursID -or $null -ne $Workflow.HolidayHoursIDs) {
-        $CommandText.AppendLine("`t`$CallFlows = @()") | Out-Null
-        $CommandText.AppendLine("`t`$CallHandlingAssociations = @()") | Out-Null
+        $null = $CommandText.AppendLine('    $CallFlows = @()')
+        $null = $CommandText.AppendLine('    $CallHandlingAssociations = @()')
         if ($null -ne $Workflow.BusinessHoursID) {
-            $CommandText.AppendLine("`t`$CallFlows += `$AfterHoursCallFlow") | Out-Null
-            $CommandText.AppendLine("`t`$CallHandlingAssociations += `$AfterHoursCallHandlingAssociation") | Out-Null
+            $null = $CommandText.AppendLine('    $CallFlows += $AfterHoursCallFlow')
+            $null = $CommandText.AppendLine('    $CallHandlingAssociations += $AfterHoursCallHandlingAssociation')
         }
         for ($i = 1; $i -le $Workflow.HolidayHoursIDs.Count; $i++) {
             if ($null -ne $Workflow.HolidayHoursIDs[($i - 1)]) {
-                $CommandText.AppendLine("`t`$CallFlows += `$HolidayCallFlow$i") | Out-Null
-                $CommandText.AppendLine("`t`$CallHandlingAssociations += `$HolidayCallHandlingAssociation$i") | Out-Null
+                $null = $CommandText.AppendLine("    `$CallFlows += `$HolidayCallFlow$i")
+                $null = $CommandText.AppendLine("    `$CallHandlingAssociations += `$HolidayCallHandlingAssociation$i")
             }
         }
-        $CommandText.AppendLine("`t`$AAParams['CallFlows'] = `$CallFlows") | Out-Null
-        $CommandText.AppendLine("`t`$AAParams['CallHandlingAssociations'] = `$CallHandlingAssociations") | Out-Null
+        $null = $CommandText.AppendLine('    $AAParams[''CallFlows''] = $CallFlows')
+        $null = $CommandText.AppendLine('    $AAParams[''CallHandlingAssociations''] = $CallHandlingAssociations')
     }
-    $CommandText.AppendLine("`ttry {") | Out-Null
-    $CommandText.AppendLine("`t`t`$AutoAttendant = New-CsAutoAttendant @AAParams") | Out-Null
-    $CommandText.AppendLine("`t} catch {") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `"Unable to create new AA for `$AAName ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
-    $CommandText.AppendLine("`t`texit") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine('    try {')
+    $null = $CommandText.AppendLine('        $AutoAttendant = New-CsAutoAttendant @AAParams')
+    $null = $CommandText.AppendLine('    } catch {')
+    $null = $CommandText.AppendLine('        Write-Warning "Unable to create new AA for $AAName ending processing."')
+    $null = $CommandText.AppendLine('        Write-Warning $_.Exception')
+    $null = $CommandText.AppendLine('        exit')
+    $null = $CommandText.AppendLine('    }')
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("`t# Creating Auto Attendant Application Instance Association") | Out-Null
-    $CommandText.AppendLine("`ttry {") | Out-Null
-    $CommandText.AppendLine("`t`t`$AAAssoc = New-CsOnlineApplicationInstanceAssociation -ConfigurationType AutoAttendant -ConfigurationId `$(`$AutoAttendant.Identity) -Identities `$AAInstanceId") | Out-Null
-    $CommandText.AppendLine("`t} catch {") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `"Unable to create application association for $($CallQueueParams['Name']) ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
-    $CommandText.AppendLine("`t`texit") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine('    # Creating Auto Attendant Application Instance Association')
+    $null = $CommandText.AppendLine('    try {')
+    $null = $CommandText.AppendLine('        $AAAssoc = New-CsOnlineApplicationInstanceAssociation -ConfigurationType AutoAttendant -ConfigurationId $($AutoAttendant.Identity) -Identities $AAInstanceId')
+    $null = $CommandText.AppendLine('    } catch {')
+    $null = $CommandText.AppendLine("        Write-Warning 'Unable to create application association for $($CallQueueParams['Name']) ending processing.'")
+    $null = $CommandText.AppendLine('        Write-Warning $_.Exception')
+    $null = $CommandText.AppendLine('        exit')
+    $null = $CommandText.AppendLine('    }')
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("`t# Assigning Usage Location to the created application instances") | Out-Null
-    $CommandText.AppendLine("`tif (`$null -eq `$AAInstanceId -or `$null -eq `$CQInstanceId) {") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `"Missing Instance ObjectIDs, cannot assign licenses, ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`texit") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine("`ttry {") | Out-Null
-    $CommandText.AppendLine("`t`tGet-AzureADUser -ObjectId `$AAInstanceId | Set-AzureADUser -UsageLocation `"$UsageLocation`"") | Out-Null
-    $CommandText.AppendLine("`t`tGet-AzureADUser -ObjectId `$CQInstanceId | Set-AzureADUser -UsageLocation `"$UsageLocation`"") | Out-Null
-    $CommandText.AppendLine("`t} catch {") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `"Unable to set Usage Location for objects, ending processing.`"") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
-    $CommandText.AppendLine("`t`texit") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine("`tdo {") | Out-Null
-    $CommandText.AppendLine("`t`tStart-Sleep -Seconds 2") | Out-Null
-    $CommandText.AppendLine("`t`t`$AALocation = (Get-CsOnlineUser -Identity `$AAInstanceId).UsageLocation") | Out-Null
-    $CommandText.AppendLine("`t`t`$CQLocation = (Get-CsOnlineUser -Identity `$CQInstanceId).UsageLocation") | Out-Null
-    $CommandText.AppendLine("`t} while ([string]::IsNullOrEmpty(`$AALocation) -or [string]::IsNullOrEmpty(`$CQLocation))") | Out-Null
-    $CommandText.AppendLine() | Out-Null
+    $null = $CommandText.AppendLine('    # Assigning Usage Location to the created application instances')
+    $null = $CommandText.AppendLine('    if ($null -eq $AAInstanceId -or $null -eq $CQInstanceId) {')
+    $null = $CommandText.AppendLine('        Write-Warning ''Missing Instance ObjectIDs, cannot assign licenses, ending processing.''')
+    $null = $CommandText.AppendLine('        exit')
+    $null = $CommandText.AppendLine('    }')
+    $null = $CommandText.AppendLine('    try {')
+    $null = $CommandText.AppendLine("        Update-MgUser -UserId `$AAInstanceId -UsageLocation '$UsageLocation' -ErrorAction Stop")
+    $null = $CommandText.AppendLine("        Update-MgUser -UserId `$CQInstanceId -UsageLocation '$UsageLocation' -ErrorAction Stop")
+    $null = $CommandText.AppendLine('    } catch {')
+    $null = $CommandText.AppendLine('        Write-Warning ''Unable to set Usage Location for objects, ending processing.''')
+    $null = $CommandText.AppendLine('        Write-Warning $_.Exception')
+    $null = $CommandText.AppendLine('        exit')
+    $null = $CommandText.AppendLine('    }')
+    $null = $CommandText.AppendLine('    do {')
+    $null = $CommandText.AppendLine('        Start-Sleep -Seconds 2')
+    $null = $CommandText.AppendLine('        $AALocation = (Get-CsOnlineUser -Identity $AAInstanceId).UsageLocation')
+    $null = $CommandText.AppendLine('        $CQLocation = (Get-CsOnlineUser -Identity $CQInstanceId).UsageLocation')
+    $null = $CommandText.AppendLine('    } while ([string]::IsNullOrEmpty($AALocation) -or [string]::IsNullOrEmpty($CQLocation))')
+    $null = $CommandText.AppendLine()
 
-    $CommandText.AppendLine("`t# Assigning the licenses to the Auto Attendant Instance") | Out-Null
-    $CommandText.AppendLine("`t`$LicenseSkuId = `"440eaaa8-b3e0-484b-a8be-62870b9ba70a`" # this guid is the phone system virtual user by default") | Out-Null
-    $CommandText.AppendLine("`t`$SkuFeaturesToEnable = @(`"TEAMS1`",`"MCOPSTN1`", `"MCOEV`", `"MCOEV_VIRTUALUSER`")") | Out-Null
-    $CommandText.AppendLine("`t`$StandardLicense = @(Get-AzureADSubscribedSku).Where({`$_.SkuId -eq `$LicenseSkuId})[0]") | Out-Null
-    $CommandText.AppendLine("`t`$SkuFeaturesToDisable = `$StandardLicense.ServicePlans.Where({`$_.ServicePlanName -notin `$SkuFeaturesToEnable})") | Out-Null
-    $CommandText.AppendLine("`t`$License = [Microsoft.Open.AzureAD.Model.AssignedLicense]::new()") | Out-Null
-    $CommandText.AppendLine("`t`$License.SkuId = `$StandardLicense.SkuId") | Out-Null
-    $CommandText.AppendLine("`t`$License.DisabledPlans = `$SkuFeaturesToDisable.ServicePlanId") | Out-Null
-    $CommandText.AppendLine("`t`$LicensesToAssign = [Microsoft.Open.AzureAD.Model.AssignedLicenses]::new()") | Out-Null
-    $CommandText.AppendLine("`t`$LicensesToAssign.AddLicenses = `$License") | Out-Null
-    $CommandText.AppendLine("`ttry {") | Out-Null
-    $CommandText.AppendLine("`t`tSet-AzureADUserLicense -ObjectId `$AAInstanceId -AssignedLicenses `$LicensesToAssign") | Out-Null
-    $CommandText.AppendLine("`t} catch {") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `"Unable to apply license plan to `$AAInstanceId, you will need to do this manually.`"") | Out-Null
-    $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
-    $CommandText.AppendLine("`t`texit") | Out-Null
-    $CommandText.AppendLine("`t} finally {") | Out-Null
-    $CommandText.AppendLine("`t`t`$DeploymentStatus = `"WorkflowDeployed`"") | Out-Null
-    $CommandText.AppendLine("`t`t`$Config.DeploymentStatus = `$DeploymentStatus") | Out-Null
-    $CommandText.AppendLine("`t`t`$Config | Export-Csv -Path `$CsvPath -NoTypeInformation") | Out-Null
-    $CommandText.AppendLine("`t}") | Out-Null
-    $CommandText.AppendLine("}") | Out-Null
+    $null = $CommandText.AppendLine('    # Assigning the licenses to the Auto Attendant Instance')
+    $null = $CommandText.AppendLine('    $LicenseSkuId = ''440eaaa8-b3e0-484b-a8be-62870b9ba70a'' # this guid is the phone system virtual user by default')
+    $null = $CommandText.AppendLine('    $SkuFeaturesToEnable = @(''TEAMS1'',''MCOPSTN1'', ''MCOEV'', ''MCOEV_VIRTUALUSER'')')
+    $null = $CommandText.AppendLine('    $StandardLicense = @(Get-MgSubscribedSku).Where({$_.SkuId -eq $LicenseSkuId})[0]')
+    $null = $CommandText.AppendLine('    $SkuFeaturesToDisable = $StandardLicense.ServicePlans.Where({$_.ServicePlanName -notin $SkuFeaturesToEnable})')
+    $null = $CommandText.AppendLine('    $License = @{}')
+    $null = $CommandText.AppendLine('    $License[''SkuId''] = $StandardLicense.SkuId')
+    $null = $CommandText.AppendLine('    $License[''DisabledPlans''] = [string[]]$SkuFeaturesToDisable.ServicePlanId')
+    $null = $CommandText.AppendLine('    try {')
+    $null = $CommandText.AppendLine('        Set-MgUserLicense -UserId $AAInstanceId -AddLicenses @($License) -RemoveLicenses @() -ErrorAction Stop')
+    $null = $CommandText.AppendLine('    } catch {')
+    $null = $CommandText.AppendLine('        Write-Warning "Unable to apply license plan to $AAInstanceId, you will need to do this manually."')
+    $null = $CommandText.AppendLine('        Write-Warning $_.Exception')
+    $null = $CommandText.AppendLine('        exit')
+    $null = $CommandText.AppendLine('    } finally {')
+    $null = $CommandText.AppendLine('        $DeploymentStatus = ''WorkflowDeployed''')
+    $null = $CommandText.AppendLine('        $Config.DeploymentStatus = $DeploymentStatus')
+    $null = $CommandText.AppendLine('        $Config | Export-Csv -Path $CsvPath -NoTypeInformation')
+    $null = $CommandText.AppendLine('    }')
+    # pretty sure we have to licence both endpoints now, but unsure...
+    $null = $CommandText.AppendLine('    try {')
+    $null = $CommandText.AppendLine('        Set-MgUserLicense -UserId $CQInstanceId -AddLicenses @($License) -RemoveLicenses @() -ErrorAction Stop')
+    $null = $CommandText.AppendLine('    } catch {')
+    $null = $CommandText.AppendLine('        Write-Warning "Unable to apply license plan to $CQInstanceId, you will need to do this manually."')
+    $null = $CommandText.AppendLine('        Write-Warning $_.Exception')
+    $null = $CommandText.AppendLine('        exit')
+    $null = $CommandText.AppendLine('    } finally {')
+    $null = $CommandText.AppendLine('        $DeploymentStatus = ''WorkflowDeployed''')
+    $null = $CommandText.AppendLine('        $Config.DeploymentStatus = $DeploymentStatus')
+    $null = $CommandText.AppendLine('        $Config | Export-Csv -Path $CsvPath -NoTypeInformation')
+    $null = $CommandText.AppendLine('    }')
+    $null = $CommandText.AppendLine('}')
 
     if (![string]::IsNullOrEmpty($LineURI)) {
         $LineURI = [regex]::Replace($LineURI, 'x', ';ext=')
-        $CommandText.AppendLine() | Out-Null
-        $CommandText.AppendLine("if (`$AssignLineUri -and `$DeploymentStatus.ToLower() -eq `"workflowdeployed`") {") | Out-Null
-        $CommandText.AppendLine("`t# Assigning the phone number Auto Attendant Instance") | Out-Null
-        $CommandText.AppendLine("`ttry {") | Out-Null
-        if (!$GenerateAccountsOnPrem) {
-            $CommandText.AppendLine("`t`tSet-CsOnlineVoiceApplicationInstance -Identity `$AAInstanceId -TelephoneNumber `"+$LineUri`"") | Out-Null
-        }
-        else {
-            $CommandText.AppendLine("`t`tSet-CsHybridApplicationEndpoint -SipAddress (`"sip:`" + 'AA-' + `$Config.AAName + `"@$SipDomain`") -LineUri `"tel:+$LineUri`"") | Out-Null
-        }
-        $CommandText.AppendLine("`t} catch {") | Out-Null
-        $CommandText.AppendLine("`t`tWrite-Warning `"Unable to assign LineUri $LineUri to `$AAInstanceId, ending processing.`"") | Out-Null
-        $CommandText.AppendLine("`t`tWrite-Warning `$_.Exception") | Out-Null
-        $CommandText.AppendLine("`t`texit") | Out-Null
-        $CommandText.AppendLine("`t}") | Out-Null
+        $null = $CommandText.AppendLine()
+        $null = $CommandText.AppendLine('if ($AssignLineUri -and $DeploymentStatus.ToLower() -eq ''workflowdeployed'') {')
+        $null = $CommandText.AppendLine('    # Assigning the phone number Auto Attendant Instance')
+        $null = $CommandText.AppendLine('    try {')
+        $null = $CommandText.AppendLine("        `$null = Set-CsPhoneNumberAssignment -Identity `$AAInstanceId -PhoneNumber '+$LineUri' -PhoneNumberType DirectRouting -ErrorAction Stop")
+        $null = $CommandText.AppendLine('    } catch {')
+        $null = $CommandText.AppendLine("        Write-Warning `"Unable to assign LineUri $LineUri to `$AAInstanceId, ending processing.`"")
+        $null = $CommandText.AppendLine('        Write-Warning $_.Exception')
+        $null = $CommandText.AppendLine('        exit')
+        $null = $CommandText.AppendLine('    }')
 
-        $CommandText.AppendLine() | Out-Null
-        $CommandText.AppendLine("`t`$DeploymentStatus = `"LineUriAssigned`"") | Out-Null
-        $CommandText.AppendLine("`t`$Config.DeploymentStatus = `$DeploymentStatus") | Out-Null
-        $CommandText.AppendLine("`t`$Config | Export-Csv -Path `$CsvPath -NoTypeInformation") | Out-Null
-        $CommandText.AppendLine("}") | Out-Null
+        $null = $CommandText.AppendLine()
+        $null = $CommandText.AppendLine('    $DeploymentStatus = ''LineUriAssigned''')
+        $null = $CommandText.AppendLine('    $Config.DeploymentStatus = $DeploymentStatus')
+        $null = $CommandText.AppendLine('    $Config | Export-Csv -Path $CsvPath -NoTypeInformation')
+        $null = $CommandText.AppendLine('}')
     }
 
-    $CsvPath = [IO.Path]::Combine($GeneratedScriptsPath, ($AADispName + ".csv"))
+    $CsvPath = [IO.Path]::Combine($GeneratedScriptsPath, ($AADispName + '.csv'))
     $WorkflowInfo = [PSCustomObject]@{
         AADispName       = $AADispName
         CQDispName       = $CQDispName
         CQName           = $CQName
         AAName           = $AAName
-        DeploymentStatus = "New"
+        DeploymentStatus = 'New'
     }
     $WorkflowInfo | Export-Csv -Path $CsvPath -NoTypeInformation
 
     # Remove traling newline
-    $CommandText.Remove($CommandText.Length - [Environment]::NewLine.Length, [Environment]::NewLine.Length) | Out-Null
+    $null = $CommandText.Remove($CommandText.Length - [Environment]::NewLine.Length, [Environment]::NewLine.Length)
 
     $Warnings = (($WarningStrings.ToString() -split [Environment]::NewLine) | ForEach-Object { if (![string]::IsNullOrWhiteSpace($_)) { "# $_" } }) -join [Environment]::NewLine
     if ($Warnings.Length -gt 0) {
-        $Warnings = "# WARNINGS" + [Environment]::NewLine + $Warnings
+        $Warnings = '# WARNINGS' + [Environment]::NewLine + $Warnings
         $Warnings += [Environment]::NewLine + [Environment]::NewLine
     }
+    $Requires = @'
+#requires -Modules MicrosoftTeams
+#requires -Modules Microsoft.Graph.Users
+#requires -Modules Microsoft.Graph.Identity.DirectoryManagement
+#requires -Modules Microsoft.Graph.Users.Actions
 
-    $Content = ($Warnings + $CommandText.ToString()) -replace "`t", "    "
+'@
+
+    $Content = ($Requires + $Warnings + $CommandText.ToString()) -replace '    ', '    '
     Set-Content -Path $FileName -Value $Content -Encoding UTF8
 }
 
@@ -1491,4 +1465,4 @@ foreach ($CsvFile in $CsvFiles) {
 [PSCustomObject]$Statuses
 '@
 
-Set-Content -Value $StatusScript -Path ([IO.Path]::Combine($GeneratedScriptsPath, "GetDeploymentStatus.ps1"))
+Set-Content -Value $StatusScript -Path ([IO.Path]::Combine($GeneratedScriptsPath, 'GetDeploymentStatus.ps1'))
