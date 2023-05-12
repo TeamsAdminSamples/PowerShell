@@ -12,7 +12,10 @@ param(
     # Default Usage Location
     [Parameter()]
     [string]
-    $UsageLocation = 'US'
+    $UsageLocation = 'US',
+
+    [switch]
+    $GCC
 )
 
 # TODO: add lines for required modules
@@ -1370,7 +1373,13 @@ foreach ($Workflow in $CallQueues) {
     $null = $CommandText.AppendLine()
 
     $null = $CommandText.AppendLine('    # Assigning the licenses to the Auto Attendant Instance')
-    $null = $CommandText.AppendLine('    $LicenseSkuId = ''440eaaa8-b3e0-484b-a8be-62870b9ba70a'' # this guid is the phone system virtual user by default')
+    if ($GCC) {
+        $null = $CommandText.AppendLine('    $LicenseSkuId = ''2cf22bcb-0c9e-4bc6-8daf-7e7654c0f285'' # this guid is the phone system virtual user by default for GCC tenants')
+    }
+    else {
+        $null = $CommandText.AppendLine('    $LicenseSkuId = ''440eaaa8-b3e0-484b-a8be-62870b9ba70a'' # this guid is the phone system virtual user by default')
+    }
+
     $null = $CommandText.AppendLine('    $SkuFeaturesToEnable = @(''TEAMS1'',''MCOPSTN1'', ''MCOEV'', ''MCOEV_VIRTUALUSER'')')
     $null = $CommandText.AppendLine('    $StandardLicense = @(Get-MgSubscribedSku).Where({$_.SkuId -eq $LicenseSkuId})[0]')
     $null = $CommandText.AppendLine('    $SkuFeaturesToDisable = $StandardLicense.ServicePlans.Where({$_.ServicePlanName -notin $SkuFeaturesToEnable})')
@@ -1433,8 +1442,7 @@ foreach ($Workflow in $CallQueues) {
 #requires -Modules Microsoft.Graph.Users
 #requires -Modules Microsoft.Graph.Identity.DirectoryManagement
 #requires -Modules Microsoft.Graph.Users.Actions
-
-'@
+'@ + [Environment]::NewLine
 
     $Content = ($Requires + $Warnings + $CommandText.ToString()) -replace '    ', '    '
     Set-Content -Path $FileName -Value $Content -Encoding UTF8
